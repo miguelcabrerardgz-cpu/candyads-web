@@ -24,6 +24,9 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
   - `aviso-legal.html`, `politica-cookies.html`, `politica-privacidad.html` — páginas legales (LSSI-CE / RGPD)
   - `presentacion-*.pdf` — presentaciones comerciales por sector; no están enlazadas desde el sitio, se usan para envío directo a prospectos
   - `CNAME`, `.nojekyll` — necesarios para GitHub Pages
+  - `lead.html`, `gracias.html`, `404.html`, `assets/lead.js`, `assets/lead.css` — formulario de leads por anunciante. El QR apunta a `/lead/<slug>`; GitHub Pages no tiene rewrites, así que `404.html` redirige a `lead.html?s=<slug>`. Todo el contenido dinámico se inserta con `textContent`. Páginas con CSP y `noindex`, sin recursos de terceros.
+  - `data/anunciantes/<slug>.json` — config pública del anunciante (nombre, activo, tema de color/logo, campos). NUNCA poner aquí el email de destino: el repo es público, ese dato va en Supabase.
+  - `assets/anunciantes/` — logos de anunciantes
 - `_archivo-versiones-previas/` — borradores antiguos, fuera de uso, no se publican
 
 ## Integraciones externas
@@ -41,6 +44,8 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 ## En marcha: sistema de leads para anunciantes
 
 Requisito no negociable: el dato personal del lead va completo al anunciante y Candy Ads nunca lo almacena; solo un contador agregado. Decisiones tomadas: backend en Supabase Edge Function, envío por Amazon SES (Resend descartado porque retiene el contenido 30 días), anti-spam propio + ALTCHA (sin Turnstile: carga desde IPs de Cloudflare). El email de cada anunciante no va en JSON público, se guarda en Supabase.
+
+Estado: Fase 1 (migración a GitHub Pages) hecha. Fase 2a (formulario visual, modo demostración, `ENDPOINT` vacío en `lead.js`) hecha y aprobada, sin publicar. Pendiente: 2b (Supabase + SES + ALTCHA) y 2c (generador de QR local y panel interno).
 
 ## Convenciones
 

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Candy Ads</title>
+<link rel="stylesheet" href="/assets/lead.css">
+<script>
+// GitHub Pages no tiene rewrites: /lead/<slug> cae aquí y se reenvía al formulario.
+(function () {
+  var m = location.pathname.match(/^\/lead\/([a-z0-9][a-z0-9-]{0,60})\/?$/i);
+  if (m) location.replace('/lead.html?s=' + encodeURIComponent(m[1].toLowerCase()));
+})();
+</script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">Candy<span>Ads</span></a></header>
+<main class="wrap">
+  <div class="card center">
+    <p class="eyebrow">Error 404</p>
+    <h1>Página no encontrada</h1>
+    <p class="lead">La página que buscas no existe o ha cambiado de sitio.</p>
+    <a href="/">Ir a candyads.es</a>
+  </div>
+</main>
+</body>
+</html>
