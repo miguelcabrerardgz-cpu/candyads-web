@@ -1,9 +1,9 @@
 (function () {
   'use strict';
 
-  // URL base del backend (rutas /challenge y /lead). Vacío = modo demostración: no se envía nada.
+  // URL base del backend en AWS Lambda (rutas /challenge y /lead). Vacío = modo demostración: no se envía nada.
   // En localhost se usa un backend de pruebas del mismo origen.
-  var ENDPOINT = location.hostname === 'localhost' ? '/api' : '';
+  var ENDPOINT = location.hostname === 'localhost' ? '/api' : 'https://rx4ydbbhvlm4zuyo3p5ci3an3q0filte.lambda-url.eu-west-1.on.aws';
   var MIN_MS = 2500;
   var SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
 
