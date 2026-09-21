@@ -157,7 +157,7 @@ export function createHandler(deps) {
       const reservado = await rpc('reservar_lead_ref', { p_slug: slug, p_ref: ref });
       if (reservado !== true) return fin(429, 'limite_diario', slug);
 
-      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase() });
+      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase(), sitio: env.SITE_URL });
       let envio;
       try {
         envio = await sendEmail({ from: env.SES_FROM, to: destino, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });

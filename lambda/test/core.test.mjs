@@ -120,6 +120,7 @@ test('trazabilidad: el lead queda registrado como enviado con id de SES y su ref
   assert.equal(reg.slug, 'lacasa-piloto');
   assert.deepEqual(Object.keys(reg).sort(), ['estado', 'mensaje', 'slug']);
   assert.ok(estado.correos[0].text.includes('Referencia: ' + ref.slice(0, 8).toUpperCase()));
+  assert.ok(estado.correos[0].html.includes('https://candyads.es/assets/candyads-icono.png'), 'el correo lleva el logo oficial');
 });
 
 test('reutilizar la misma solución ALTCHA es rechazado', async () => {

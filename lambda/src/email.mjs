@@ -17,7 +17,8 @@ const AVISO = 'Este mensaje contiene datos personales que la persona interesada 
   'Tú eres el responsable de su tratamiento.';
 
 // Devuelve el correo listo para enviar. No incluye datos personales en el asunto.
-export function construirCorreo({ nombreAnunciante, datos, ahora, referencia }) {
+export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, sitio }) {
+  const base = String(sitio || 'https://candyads.es').replace(/\/+$/, '');
   const filas = Object.keys(datos)
     .filter((id) => CATALOGO[id] && datos[id])
     .map((id) => ({ etiqueta: CATALOGO[id].label, valor: datos[id] }));
@@ -35,7 +36,7 @@ export function construirCorreo({ nombreAnunciante, datos, ahora, referencia }) 
   const html = `<!DOCTYPE html><html lang="es"><body style="margin:0;background:#F7F8FC;font-family:Arial,Helvetica,sans-serif;color:#2D2D3A;">
 <div style="max-width:560px;margin:0 auto;padding:24px;">
 <div style="background:#ffffff;border:1px solid #E4E4EF;border-radius:12px;padding:24px;">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#7C3AED;font-weight:700;">Candy Ads</p>
+<p style="margin:0 0 14px;line-height:0;"><img src="${esc(base)}/assets/candyads-icono.png" alt="Candy Ads" width="44" height="44" style="display:inline-block;vertical-align:middle;border:0;"><img src="${esc(base)}/assets/candyads-logotipo.jpg" alt="" width="74" height="31" style="display:inline-block;vertical-align:middle;border:0;margin-left:-4px;"></p>
 <h1 style="margin:0 0 6px;font-size:22px;color:#0F0F14;">Nuevo contacto para ${esc(nombreAnunciante)}</h1>
 <p style="margin:0 0 18px;font-size:13px;color:#6B6B80;">Recibido el ${esc(fechaMadrid(ahora))}${referencia ? ` &middot; Ref. ${esc(referencia)}` : ''}</p>
 <table role="presentation" style="width:100%;border-collapse:collapse;">
