@@ -39,7 +39,8 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 ## Pendiente conocido
 
 - El Aviso Legal tiene el NIF marcado como "Pendiente de incorporar al tramitar el alta de autónomo".
-- No hay registro MX en el DNS: los correos a equipo@candyads.es no llegan (hay un TXT de verificación de Zoho a medias).
+- Correo de equipo@candyads.es: recibe con Zoho Mail EU (MX mx/mx2/mx3.zoho.eu, SPF `include:zohomail.eu`). Falta comprobar/activar el DKIM de Zoho. Los leads salen por SES con sus propios DKIM (no tocar esos CNAME `*._domainkey`).
+- SES: solicitud de acceso a producción enviada el 2026-09-21 (sigue en revisión hasta que AWS conteste, hasta 24 h). Hasta entonces solo envía a direcciones verificadas.
 
 ## Sistema de leads para anunciantes
 
