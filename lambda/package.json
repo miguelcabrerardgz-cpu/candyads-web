@@ -1,0 +1,15 @@
+{
+  "name": "candyads-lead-endpoint",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "esbuild src/handler.mjs --bundle --platform=node --target=node22 --format=esm --external:@aws-sdk/* --outfile=dist/index.mjs"
+  },
+  "dependencies": {
+    "altcha-lib": "2.5.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

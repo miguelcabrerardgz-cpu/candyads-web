@@ -4,3 +4,5 @@ Thumbs.db
 .vscode/
 .wrangler/
 .dev.vars
+lambda/node_modules/
+lambda/dist/
