@@ -11,6 +11,7 @@ const CFG_TTL = 5 * 60 * 1000;
 const CFG_TTL_NEG = 60 * 1000;
 const RETO_TTL_S = 10 * 60;
 const RETO_COST = 1000;
+const ENV_OBLIGATORIAS = ['ALLOWED_ORIGIN', 'SITE_URL', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'ALTCHA_HMAC_SECRET', 'ALTCHA_HMAC_KEY_SECRET', 'SES_FROM'];
 
 // req: { method, path, headers (en minúsculas), body (string), ip }
 // deps: { env, fetchImpl, sendEmail, altcha, now, log }
@@ -179,6 +180,12 @@ export function createHandler(deps) {
       return permitido ? { statusCode: 204, headers: cors, body: '' } : json(403, { ok: false, code: 'origen' });
     }
     if (!permitido) return json(403, { ok: false, code: 'origen' });
+
+    const faltan = ENV_OBLIGATORIAS.filter((k) => !env[k]);
+    if (faltan.length && (req.path.endsWith('/challenge') || req.path.endsWith('/lead'))) {
+      log.error(JSON.stringify({ evt: 'config_incompleta', faltan }));
+      return json(500, { ok: false, code: 'config' }, cors);
+    }
 
     if (req.method === 'GET' && req.path.endsWith('/challenge')) {
       try { return json(200, await crearReto(), cors); }

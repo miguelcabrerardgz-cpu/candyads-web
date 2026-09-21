@@ -225,3 +225,20 @@ test('caracteres de control se eliminan y el email no admite saltos de línea', 
   assert.equal(ok.statusCode, 200);
   assert.ok(estado.correos[0].text.includes('Nombre: Ana López'));
 });
+
+test('sin configuración completa el backend falla cerrado (no emite retos ni acepta leads)', async () => {
+  const estado = { logs: [] };
+  const handle = createHandler({
+    env: { ALLOWED_ORIGIN: ORIGIN, SITE_URL: ORIGIN, SUPABASE_URL: 'https://x.supabase.co', SES_FROM: 'a@b.es' },
+    altcha: { createChallenge, verifySolution, randomInt, deriveKey },
+    sendEmail: async () => { throw new Error('no debería enviar'); },
+    log: { info: (m) => estado.logs.push(m), error: (m) => estado.logs.push(m) }
+  });
+  const r1 = await handle({ method: 'GET', path: '/challenge', headers: cab, body: '', ip: '1.1.1.1' });
+  assert.equal(r1.statusCode, 500);
+  assert.equal(JSON.parse(r1.body).code, 'config');
+  const r2 = await handle({ method: 'POST', path: '/lead', headers: cab, body: '{}', ip: '1.1.1.2' });
+  assert.equal(r2.statusCode, 500);
+  assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'));
+  assert.ok(!estado.logs.join('').includes('sb_secret'));
+});
