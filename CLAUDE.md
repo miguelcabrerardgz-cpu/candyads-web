@@ -27,6 +27,7 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
   - `lead.html`, `gracias.html`, `404.html`, `assets/lead.js`, `assets/lead.css` — formulario de leads por anunciante. El QR apunta a `/lead/<slug>`; GitHub Pages no tiene rewrites, así que `404.html` redirige a `lead.html?s=<slug>`. Todo el contenido dinámico se inserta con `textContent`. Páginas con CSP y `noindex`, sin recursos de terceros.
   - `data/anunciantes/<slug>.json` — config pública del anunciante (nombre, activo, tema de color/logo, campos). NUNCA poner aquí el email de destino: el repo es público, ese dato va en Supabase.
   - `assets/anunciantes/` — logos de anunciantes
+  - `assets/candyads-icono.png` + `assets/candyads-logotipo.jpg` — logo oficial de Candy Ads (cubo + logotipo), extraído de la cabecera de `index.html` y reducido. Es el que se usa en `lead.html`, `gracias.html`, `404.html` y `panel.html` (clase `logo-top` en `lead.css`). NUNCA sustituirlo por el nombre escrito en texto: la marca es esa imagen. Si se cambia `lead.css`, subir el `?v=` de su enlace en los HTML (GitHub Pages cachea 10 min).
 - `_archivo-versiones-previas/` — borradores antiguos, fuera de uso, no se publican
 
 ## Integraciones externas
