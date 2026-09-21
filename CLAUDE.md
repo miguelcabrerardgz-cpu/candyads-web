@@ -41,11 +41,21 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 - El Aviso Legal tiene el NIF marcado como "Pendiente de incorporar al tramitar el alta de autónomo".
 - No hay registro MX en el DNS: los correos a equipo@candyads.es no llegan (hay un TXT de verificación de Zoho a medias).
 
-## En marcha: sistema de leads para anunciantes
+## Sistema de leads para anunciantes
 
-Requisito no negociable: el dato personal del lead va completo al anunciante y Candy Ads nunca lo almacena; solo un contador agregado. Decisiones tomadas: backend en Supabase Edge Function, envío por Amazon SES (Resend descartado porque retiene el contenido 30 días), anti-spam propio + ALTCHA (sin Turnstile: carga desde IPs de Cloudflare). El email de cada anunciante no va en JSON público, se guarda en Supabase.
+Requisito no negociable: el dato personal del lead va completo al anunciante y Candy Ads nunca lo almacena; solo un contador agregado.
 
-Estado: Fase 1 (migración a GitHub Pages) hecha. Fase 2a (formulario visual, modo demostración, `ENDPOINT` vacío en `lead.js`) hecha y aprobada, sin publicar. Pendiente: 2b (Supabase + SES + ALTCHA) y 2c (generador de QR local y panel interno).
+Arquitectura (formulario en `docs/`, backend fuera de Cloudflare porque sus IPs se bloquean en España en partidos):
+- `lambda/` — endpoint público en **AWS Lambda** `candyads-lead` (eu-west-1, Function URL, auth NONE; CORS en el código, solo `https://candyads.es`). Rutas `/challenge` (reto ALTCHA firmado) y `/lead`. Node: `npm test` (15 tests), `npm run build` -> `dist/index.mjs` y zip para subir a mano en la consola de Lambda. Falla cerrado si falta configuración.
+- Envío por **Amazon SES** (identidad `candyads.es` verificada, DKIM, DMARC p=none). El rol de Lambda solo tiene `ses:SendEmail` con remitente `leads@candyads.es`. Sin claves de AWS de larga duración. Resend descartado: retiene el contenido 30 días.
+- `supabase/migrations/` — proyecto Supabase `candyads-leads` (eu-central-1). Solo contadores (`leads_count`), email de destino por anunciante (`anunciantes_destino`), retos ALTCHA usados y admins del panel. Lambda solo llama a funciones RPC (`destino_de`, `reservar_lead`, `liberar_lead`, `consumir_reto`) con la secret key; un anónimo recibe 401 en todo.
+- Anti-spam: ALTCHA (prueba de trabajo, en `docs/assets/altcha/`, sin terceros) + campo trampa + límite diario por anunciante + límite por IP solo en memoria. No se guardan IPs. Coste del reto: `ALTCHA_COST` (defecto 1000).
+- Variables de entorno de Lambda: `ALLOWED_ORIGIN`, `SITE_URL`, `SUPABASE_URL`, `SES_FROM`, `SUPABASE_SECRET_KEY`, `ALTCHA_HMAC_SECRET`, `ALTCHA_HMAC_KEY_SECRET`. Los secretos solo viven ahí, nunca en el repo.
+- El endpoint se configura en `ENDPOINT` de `docs/assets/lead.js` (en localhost usa `/api`).
+
+Añadir un anunciante: 1) `docs/data/anunciantes/<slug>.json` (nombre, activo, tema, campos; sin email); 2) fila en `anunciantes_destino` de Supabase con su email y límite diario; 3) QR a `https://candyads.es/lead/<slug>`.
+
+Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. Pendiente: pedir a AWS la salida del modo pruebas de SES (hoy solo envía a direcciones verificadas), pasar Supabase a Pro, 2c (generador de QR local y panel interno con Supabase Auth), datos legales de La Casa y actualizar políticas de privacidad/cookies.
 
 ## Convenciones
 
