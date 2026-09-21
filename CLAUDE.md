@@ -22,7 +22,7 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 - `docs/` — lo único que se publica
   - `index.html` — landing principal (una sola página, imágenes embebidas en base64)
   - `aviso-legal.html`, `politica-cookies.html`, `politica-privacidad.html` — páginas legales (LSSI-CE / RGPD)
-  - `presentacion-*.pdf` — presentaciones comerciales por sector; no están enlazadas desde el sitio, se usan para envío directo a prospectos
+  - `presentacion-*.pdf` — presentaciones comerciales por sector; no están enlazadas desde el sitio, se usan para envío directo a prospectos. Generados con WeasyPrint desde un HTML que NO está en el repo; el 2026-09-22 se editaron directamente con PyMuPDF (email a `equipo@candyads.es` y logo oficial en portada y cabeceras). Si hay que volver a tocarlos, editar el PDF igual o rehacerlos desde su fuente, y usar siempre `equipo@candyads.es` (nunca el Gmail personal) y el logo oficial
   - `CNAME`, `.nojekyll` — necesarios para GitHub Pages
   - `lead.html`, `gracias.html`, `404.html`, `assets/lead.js`, `assets/lead.css` — formulario de leads por anunciante. El QR apunta a `/lead/<slug>`; GitHub Pages no tiene rewrites, así que `404.html` redirige a `lead.html?s=<slug>`. Todo el contenido dinámico se inserta con `textContent`. Páginas con CSP y `noindex`, sin recursos de terceros.
   - `data/anunciantes/<slug>.json` — config pública del anunciante (nombre, activo, tema de color/logo, campos). NUNCA poner aquí el email de destino: el repo es público, ese dato va en Supabase.
