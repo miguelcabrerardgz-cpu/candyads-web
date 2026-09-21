@@ -8,7 +8,7 @@ const ORIGIN = 'https://candyads.es';
 const PERSONALES = ['Marta Prueba', '600123456', 'marta.prueba@example.com', 'Quiero vender mi vivienda', 'Mensaje privado 123'];
 
 function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFalla = false } = {}) {
-  const estado = { retos: new Set(), contador: 0, correos: [], logs: [], reloj: Date.now() };
+  const estado = { retos: new Set(), contador: 0, registro: new Map(), correos: [], logs: [], reloj: Date.now() };
   const cfgSitio = config ?? { nombre_mostrado: 'La Casa Agency', activo: true, campos: ['nombre', 'telefono', 'email', 'interes_venta_alquiler', 'mensaje'] };
 
   const fetchImpl = async (url, init) => {
@@ -25,7 +25,9 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
       if (fn === 'destino_de') out = a.p_slug === 'lacasa-piloto' ? destino : null;
       else if (fn === 'consumir_reto') { out = !estado.retos.has(a.p_huella); estado.retos.add(a.p_huella); }
       else if (fn === 'reservar_lead') { out = estado.contador < limite; if (out) estado.contador += 1; }
-      else if (fn === 'liberar_lead') { estado.contador = Math.max(0, estado.contador - 1); out = null; }
+      else if (fn === 'reservar_lead_ref') { out = estado.contador < limite; if (out) { estado.contador += 1; estado.registro.set(a.p_ref, { slug: a.p_slug, estado: 'pendiente' }); } }
+      else if (fn === 'confirmar_lead_ref') { Object.assign(estado.registro.get(a.p_ref), { estado: 'enviado', mensaje: a.p_mensaje }); out = null; }
+      else if (fn === 'fallar_lead_ref') { estado.registro.get(a.p_ref).estado = 'error'; estado.contador = Math.max(0, estado.contador - 1); out = null; }
       return { ok: true, status: 200, json: async () => out };
     }
     throw new Error('fetch inesperado: ' + u);
@@ -44,7 +46,7 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
     },
     fetchImpl,
     altcha: { createChallenge, verifySolution, randomInt, deriveKey },
-    sendEmail: async (m) => { if (sesFalla) throw Object.assign(new Error('boom'), { name: 'MessageRejected' }); estado.correos.push(m); },
+    sendEmail: async (m) => { if (sesFalla) throw Object.assign(new Error('boom'), { name: 'MessageRejected' }); estado.correos.push(m); return { messageId: 'ses-msg-1' }; },
     now: () => estado.reloj,
     log
   });
@@ -106,6 +108,18 @@ test('camino feliz: un email al anunciante, contador +1, sin datos personales en
   const logs = estado.logs.join('\n');
   for (const p of PERSONALES) assert.ok(!logs.includes(p), 'log con dato personal: ' + p);
   assert.ok(!logs.includes('jose@lacasa.example'));
+});
+
+test('trazabilidad: el lead queda registrado como enviado con id de SES y su referencia va en el correo, sin datos personales', async () => {
+  const { handle, estado } = entorno();
+  await enviar(handle);
+  assert.equal(estado.registro.size, 1);
+  const [[ref, reg]] = [...estado.registro];
+  assert.equal(reg.estado, 'enviado');
+  assert.equal(reg.mensaje, 'ses-msg-1');
+  assert.equal(reg.slug, 'lacasa-piloto');
+  assert.deepEqual(Object.keys(reg).sort(), ['estado', 'mensaje', 'slug']);
+  assert.ok(estado.correos[0].text.includes('Referencia: ' + ref.slice(0, 8).toUpperCase()));
 });
 
 test('reutilizar la misma solución ALTCHA es rechazado', async () => {
@@ -189,6 +203,7 @@ test('si SES falla se libera la reserva: el contador no cuenta leads no entregad
   const r = await enviar(handle);
   assert.equal(r.statusCode, 502);
   assert.equal(estado.contador, 0);
+  assert.equal([...estado.registro.values()][0].estado, 'error');
   const logs = estado.logs.join('\n');
   for (const p of PERSONALES) assert.ok(!logs.includes(p));
 });

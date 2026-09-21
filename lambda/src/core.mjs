@@ -1,6 +1,6 @@
 import { validarDatos } from './campos.mjs';
 import { construirCorreo } from './email.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
 const MAX_BODY = 8192;
@@ -153,17 +153,21 @@ export function createHandler(deps) {
       const nuevo = await rpc('consumir_reto', { p_huella: reto.huella, p_expira: reto.expira });
       if (nuevo !== true) return fin(400, 'altcha_reutilizado', slug);
 
-      const reservado = await rpc('reservar_lead', { p_slug: slug });
+      const ref = randomUUID();
+      const reservado = await rpc('reservar_lead_ref', { p_slug: slug, p_ref: ref });
       if (reservado !== true) return fin(429, 'limite_diario', slug);
 
-      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now() });
+      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase() });
+      let envio;
       try {
-        await sendEmail({ from: env.SES_FROM, to: destino, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });
+        envio = await sendEmail({ from: env.SES_FROM, to: destino, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });
       } catch (e) {
-        try { await rpc('liberar_lead', { p_slug: slug }); } catch { /* el contador se corrige a mano */ }
+        try { await rpc('fallar_lead_ref', { p_ref: ref }); } catch { /* el registro queda 'pendiente': se ve en el panel */ }
         log.error(JSON.stringify({ evt: 'lead_envio_fallido', slug, error: (e && e.name) || 'error' }));
         return fin(502, 'envio', slug);
       }
+      try { await rpc('confirmar_lead_ref', { p_ref: ref, p_mensaje: String((envio && envio.messageId) || '') }); }
+      catch (e) { log.error(JSON.stringify({ evt: 'lead_confirmacion_fallida', slug, error: (e && e.message) || 'error' })); }
     } catch (e) {
       log.error(JSON.stringify({ evt: 'lead_error', slug, error: (e && e.message) || 'error' }));
       return fin(500, 'interno', slug);

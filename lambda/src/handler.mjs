@@ -10,8 +10,8 @@ const ses = new SESv2Client({});
 const handle = createHandler({
   env: process.env,
   altcha: { createChallenge, verifySolution, randomInt, deriveKey },
-  sendEmail: ({ from, to, replyTo, subject, text, html }) =>
-    ses.send(new SendEmailCommand({
+  sendEmail: async ({ from, to, replyTo, subject, text, html }) => {
+    const r = await ses.send(new SendEmailCommand({
       FromEmailAddress: from,
       Destination: { ToAddresses: [to] },
       ReplyToAddresses: replyTo ? [replyTo] : undefined,
@@ -21,7 +21,9 @@ const handle = createHandler({
           Body: { Text: { Data: text, Charset: 'UTF-8' }, Html: { Data: html, Charset: 'UTF-8' } }
         }
       }
-    }))
+    }));
+    return { messageId: r.MessageId };
+  }
 });
 
 export const handler = async (event) => {

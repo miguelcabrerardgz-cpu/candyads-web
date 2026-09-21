@@ -6,6 +6,7 @@
   var PUBLISHABLE_KEY = 'sb_publishable_oI-te1GMOiUJWOujDo2hUw_CaEg3NpK';
 
   var app = document.getElementById('app');
+  var resumen = [];
   var token = null; // solo en memoria: al cerrar o recargar la pestana hay que volver a entrar
 
   function el(tag, cls, text) {
@@ -64,7 +65,7 @@
         if (!r.ok) throw new Error('No se pudieron leer los datos.');
         return r.json();
       })
-      .then(pintar);
+      .then(function (rows) { resumen = rows; pintar(rows); });
   }
 
   function ymd(d) {
@@ -113,10 +114,74 @@
     app.appendChild(tabla(['Anunciante', 'Hoy', 'Este mes', 'Mes anterior', 'Total (13 meses)'],
       Object.keys(por).sort().map(function (s) { var a = por[s]; return [s, a.hoy, a.mes, a.ant, a.tot]; })));
 
-    app.appendChild(el('h2', 'p', 'Detalle diario (últimos 30 registros)'));
-    app.appendChild(tabla(['Fecha', 'Anunciante', 'Leads'],
-      rows.slice(0, 30).map(function (r) { return [r.fecha, r.anunciante_slug, r.total]; })));
+    app.appendChild(el('h2', 'p', 'Detalle diario (pulsa un día para ver cada lead)'));
+    var w = tabla(['Fecha', 'Anunciante', 'Leads'],
+      rows.slice(0, 30).map(function (r) { return [r.fecha, r.anunciante_slug, r.total]; }));
+    Array.prototype.forEach.call(w.querySelectorAll('tr'), function (tr, i) {
+      if (i === 0) return;
+      tr.className = 'clic';
+      tr.addEventListener('click', function () { verDia(rows[i - 1].fecha, rows[i - 1].anunciante_slug); });
+    });
+    app.appendChild(w);
+    var ir = el('button', 'btn', 'Ver el día de hoy');
+    ir.addEventListener('click', function () { verDia(ymd(new Date()), ''); });
+    app.appendChild(ir);
     app.appendChild(el('p', 'p-note', 'Solo contadores agregados: aquí no existe ningún dato personal de leads.'));
+  }
+
+  var hora = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  var diaMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
+  function sumaDias(f, n) {
+    var d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  var ETQ = { enviado: 'Enviado', error: 'Error de envío', pendiente: 'Sin confirmar' };
+
+  // Vista de un día (hora de Madrid): un lead por fila, con hora exacta, referencia y estado.
+  function verDia(fecha, slug) {
+    api('/rest/v1/leads_registro?select=ref,anunciante_slug,recibido_at,estado&recibido_at=gte.' + sumaDias(fecha, -1) +
+        'T00:00:00Z&recibido_at=lt.' + sumaDias(fecha, 2) + 'T00:00:00Z&order=recibido_at.asc&limit=1000')
+      .then(function (r) {
+        if (r.status === 401) { token = null; login('La sesión ha caducado. Vuelve a entrar.'); return null; }
+        if (!r.ok) throw new Error('No se pudieron leer los leads.');
+        return r.json();
+      })
+      .then(function (rows) {
+        if (!rows) return;
+        var del = rows.filter(function (r) { return diaMadrid.format(new Date(r.recibido_at)) === fecha && (!slug || r.anunciante_slug === slug); });
+        pintarDia(fecha, slug, del);
+      })
+      .catch(function (e) { clear(); app.appendChild(el('div', 'p-err', e.message)); var b = el('button', 'link', 'Volver'); b.addEventListener('click', function () { pintar(resumen); }); app.appendChild(b); });
+  }
+
+  function pintarDia(fecha, slug, rows) {
+    clear();
+    var head = el('div', 'p-head');
+    var v = el('button', 'link', '← Resumen');
+    v.addEventListener('click', function () { pintar(resumen); });
+    head.appendChild(v);
+    head.appendChild(el('div', 'eyebrow', slug || 'Todos los anunciantes'));
+    app.appendChild(head);
+
+    var nav = el('div', 'p-nav');
+    var ant = el('button', 'btn nav', '‹'), sig = el('button', 'btn nav', '›');
+    var inp = el('input'); inp.type = 'date'; inp.value = fecha;
+    ant.addEventListener('click', function () { verDia(sumaDias(fecha, -1), slug); });
+    sig.addEventListener('click', function () { verDia(sumaDias(fecha, 1), slug); });
+    inp.addEventListener('change', function () { if (inp.value) verDia(inp.value, slug); });
+    nav.append(ant, inp, sig);
+    app.appendChild(nav);
+
+    var c = { enviado: 0, error: 0, pendiente: 0 };
+    rows.forEach(function (r) { c[r.estado] += 1; });
+    app.appendChild(el('p', 'p-cifras',
+      c.enviado + ' enviados' + (c.error ? ' · ' + c.error + ' con error' : '') + (c.pendiente ? ' · ' + c.pendiente + ' sin confirmar' : '')));
+    if (c.error || c.pendiente) app.appendChild(el('div', 'p-err', 'Hay leads que no constan como enviados. Revísalos antes de dar el día por bueno.'));
+
+    if (!rows.length) { app.appendChild(el('p', 'lead', 'Sin leads este día.')); return; }
+    app.appendChild(tabla(['Hora', 'Ref.', 'Anunciante', 'Estado'],
+      rows.map(function (r) { return [hora.format(new Date(r.recibido_at)), r.ref.slice(0, 8).toUpperCase(), r.anunciante_slug, ETQ[r.estado]]; })));
+    app.appendChild(el('p', 'p-note', 'Hora de Madrid. La referencia aparece también en el correo que recibe el anunciante. “Enviado” significa que Amazon SES aceptó el mensaje.'));
   }
 
   if (SUPABASE_URL.indexOf('REEMPLAZAR') !== -1) {

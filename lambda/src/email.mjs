@@ -8,7 +8,7 @@ export function esc(s) {
 
 function fechaMadrid(ms) {
   return new Intl.DateTimeFormat('es-ES', {
-    timeZone: 'Europe/Madrid', dateStyle: 'long', timeStyle: 'short'
+    timeZone: 'Europe/Madrid', dateStyle: 'long', timeStyle: 'medium'
   }).format(new Date(ms));
 }
 
@@ -17,7 +17,7 @@ const AVISO = 'Este mensaje contiene datos personales que la persona interesada 
   'Tú eres el responsable de su tratamiento.';
 
 // Devuelve el correo listo para enviar. No incluye datos personales en el asunto.
-export function construirCorreo({ nombreAnunciante, datos, ahora }) {
+export function construirCorreo({ nombreAnunciante, datos, ahora, referencia }) {
   const filas = Object.keys(datos)
     .filter((id) => CATALOGO[id] && datos[id])
     .map((id) => ({ etiqueta: CATALOGO[id].label, valor: datos[id] }));
@@ -25,6 +25,7 @@ export function construirCorreo({ nombreAnunciante, datos, ahora }) {
   const texto = [
     `Nuevo contacto para ${nombreAnunciante}`,
     `Recibido el ${fechaMadrid(ahora)}`,
+    ...(referencia ? [`Referencia: ${referencia}`] : []),
     '',
     ...filas.map((f) => `${f.etiqueta}: ${f.valor}`),
     '',
@@ -36,7 +37,7 @@ export function construirCorreo({ nombreAnunciante, datos, ahora }) {
 <div style="background:#ffffff;border:1px solid #E4E4EF;border-radius:12px;padding:24px;">
 <p style="margin:0 0 4px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#7C3AED;font-weight:700;">Candy Ads</p>
 <h1 style="margin:0 0 6px;font-size:22px;color:#0F0F14;">Nuevo contacto para ${esc(nombreAnunciante)}</h1>
-<p style="margin:0 0 18px;font-size:13px;color:#6B6B80;">Recibido el ${esc(fechaMadrid(ahora))}</p>
+<p style="margin:0 0 18px;font-size:13px;color:#6B6B80;">Recibido el ${esc(fechaMadrid(ahora))}${referencia ? ` &middot; Ref. ${esc(referencia)}` : ''}</p>
 <table role="presentation" style="width:100%;border-collapse:collapse;">
 ${filas.map((f) => `<tr><td style="padding:9px 0;border-top:1px solid #E4E4EF;font-size:13px;color:#6B6B80;width:38%;vertical-align:top;">${esc(f.etiqueta)}</td><td style="padding:9px 0;border-top:1px solid #E4E4EF;font-size:15px;color:#0F0F14;white-space:pre-wrap;">${esc(f.valor)}</td></tr>`).join('\n')}
 </table>
