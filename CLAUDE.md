@@ -8,7 +8,7 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 
 - Titular: Miguel Cabrera Rodríguez
 - Dominio: candyads.es (registrado en IONOS, DNS en Cloudflare en modo "DNS only")
-- Contacto: miguelcabrerardgz@gmail.com · 634 237 322
+- Contacto: equipo@candyads.es · 634 237 322
 
 ## Hosting
 
@@ -56,7 +56,7 @@ Arquitectura (formulario en `docs/`, backend fuera de Cloudflare porque sus IPs 
 
 Añadir un anunciante: 1) `docs/data/anunciantes/<slug>.json` (nombre, activo, tema, campos; sin email); 2) fila en `anunciantes_destino` de Supabase con su email y límite diario; 3) QR con `tools/qr.html` (herramienta local: abrir el archivo en el navegador, escribir el slug, descargar SVG para imprenta o PNG; lleva `qrcode-generator` MIT incrustado, sin red; NO va en `docs/`, no se publica). Escanear siempre el QR con un móvil antes de imprimir.
 
-Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. SES: salida del modo pruebas solicitada el 2026-09-21 (caso AWS 179002340300449); AWS pidió más detalle y se respondió ese mismo día, pendiente de su decisión (hoy solo envía a direcciones verificadas). Pendiente: pasar Supabase a Pro, panel interno con Supabase Auth (2c, parte 2; el generador de QR ya está hecho), datos legales de La Casa y actualizar políticas de privacidad/cookies.
+Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. SES: salida del modo pruebas solicitada el 2026-09-21 (caso AWS 179002340300449); AWS pidió más detalle y se respondió ese mismo día, pendiente de su decisión (hoy solo envía a direcciones verificadas). Pendiente: pasar Supabase a Pro, panel interno con Supabase Auth (2c, parte 2; el generador de QR ya está hecho), datos legales de La Casa (razón social, CIF, email de privacidad → campo `responsable` del JSON) y revisión de un abogado. La política de privacidad ya incluye la sección 8 (leads, encargado del tratamiento), publicada el 2026-09-21; el borrador de consulta jurídica vive fuera del repo (público), en `Desktop\candyads-abogado`.
 
 ## Convenciones
 
