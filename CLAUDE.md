@@ -54,9 +54,9 @@ Arquitectura (formulario en `docs/`, backend fuera de Cloudflare porque sus IPs 
 - Variables de entorno de Lambda: `ALLOWED_ORIGIN`, `SITE_URL`, `SUPABASE_URL`, `SES_FROM`, `SUPABASE_SECRET_KEY`, `ALTCHA_HMAC_SECRET`, `ALTCHA_HMAC_KEY_SECRET`. Los secretos solo viven ahí, nunca en el repo.
 - El endpoint se configura en `ENDPOINT` de `docs/assets/lead.js` (en localhost usa `/api`).
 
-Añadir un anunciante: 1) `docs/data/anunciantes/<slug>.json` (nombre, activo, tema, campos; sin email); 2) fila en `anunciantes_destino` de Supabase con su email y límite diario; 3) QR a `https://candyads.es/lead/<slug>`.
+Añadir un anunciante: 1) `docs/data/anunciantes/<slug>.json` (nombre, activo, tema, campos; sin email); 2) fila en `anunciantes_destino` de Supabase con su email y límite diario; 3) QR con `tools/qr.html` (herramienta local: abrir el archivo en el navegador, escribir el slug, descargar SVG para imprenta o PNG; lleva `qrcode-generator` MIT incrustado, sin red; NO va en `docs/`, no se publica). Escanear siempre el QR con un móvil antes de imprimir.
 
-Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. Pendiente: pedir a AWS la salida del modo pruebas de SES (hoy solo envía a direcciones verificadas), pasar Supabase a Pro, 2c (generador de QR local y panel interno con Supabase Auth), datos legales de La Casa y actualizar políticas de privacidad/cookies.
+Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. SES: salida del modo pruebas solicitada el 2026-09-21 (caso AWS 179002340300449); AWS pidió más detalle y se respondió ese mismo día, pendiente de su decisión (hoy solo envía a direcciones verificadas). Pendiente: pasar Supabase a Pro, panel interno con Supabase Auth (2c, parte 2; el generador de QR ya está hecho), datos legales de La Casa y actualizar políticas de privacidad/cookies.
 
 ## Convenciones
 
