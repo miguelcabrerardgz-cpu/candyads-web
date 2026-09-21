@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.lambda-url.eu-west-1.on.aws; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <title>Contacto · Candy Ads</title>
 <link rel="stylesheet" href="/assets/lead.css">
+<link rel="stylesheet" href="/assets/altcha/altcha.css">
 </head>
 <body data-page="lead">
 <header class="topbar"><a class="brand" href="/">Candy<span>Ads</span></a></header>
@@ -15,6 +16,8 @@
   <div class="card" id="app"><p class="lead">Cargando…</p></div>
 </main>
 <footer class="foot"><a href="/politica-privacidad.html">Privacidad</a> · <a href="/aviso-legal.html">Aviso legal</a></footer>
+<script type="module" src="/assets/altcha/altcha.js"></script>
+<script type="module" src="/assets/altcha/es-es.js"></script>
 <script src="/assets/lead.js"></script>
 </body>
 </html>

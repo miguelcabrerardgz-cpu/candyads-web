@@ -10,7 +10,7 @@ const RL_VENTANA = 10 * 60 * 1000;
 const CFG_TTL = 5 * 60 * 1000;
 const CFG_TTL_NEG = 60 * 1000;
 const RETO_TTL_S = 10 * 60;
-const RETO_COST = 5000;
+const RETO_COST = 1000;
 
 // req: { method, path, headers (en minúsculas), body (string), ip }
 // deps: { env, fetchImpl, sendEmail, altcha, now, log }

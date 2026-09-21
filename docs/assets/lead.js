@@ -1,8 +1,9 @@
 (function () {
   'use strict';
 
-  // URL de la Edge Function que recibe el lead. Vacío = modo demostración: no se envía nada.
-  var ENDPOINT = '';
+  // URL base del backend (rutas /challenge y /lead). Vacío = modo demostración: no se envía nada.
+  // En localhost se usa un backend de pruebas del mismo origen.
+  var ENDPOINT = location.hostname === 'localhost' ? '/api' : '';
   var MIN_MS = 2500;
   var SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
 
@@ -87,6 +88,27 @@
     return head;
   }
 
+  // El build "external" de ALTCHA no lleva workers: hay que registrarlos (mismo origen, sin blobs).
+  function prepararAltcha() {
+    return customElements.whenDefined('altcha-widget').then(function () {
+      var A = window.$altcha;
+      if (!A || !A.algorithms) return;
+      ['PBKDF2/SHA-256', 'PBKDF2/SHA-384', 'PBKDF2/SHA-512'].forEach(function (alg) {
+        A.algorithms.set(alg, function () { return new Worker('/assets/altcha/pbkdf2.js'); });
+      });
+    });
+  }
+
+  // Devuelve el payload firmado de ALTCHA (base64) o '' si no se pudo verificar.
+  function obtenerAltcha(widget, form) {
+    if (!widget) return Promise.resolve('');
+    return prepararAltcha().then(function () {
+      return widget.getState() === 'verified' ? null : widget.verify();
+    }).then(function () {
+      return (form.elements.altcha && form.elements.altcha.value) || '';
+    }).catch(function () { return ''; });
+  }
+
   function validar(def, v) {
     if (!v) return def.required ? (def.error || 'Campo obligatorio') : '';
     if (def.type === 'tel') {
@@ -167,6 +189,18 @@
     hp.appendChild(el('input', { id: 'f-web_site', name: 'web_site', type: 'text', tabindex: '-1', autocomplete: 'off' }));
     form.appendChild(hp);
 
+    var widget = null;
+    if (ENDPOINT) {
+      widget = document.createElement('altcha-widget');
+      widget.setAttribute('challenge', ENDPOINT + '/challenge');
+      widget.setAttribute('name', 'altcha');
+      widget.setAttribute('language', 'es-es');
+      form.appendChild(widget);
+      prepararAltcha().then(function () {
+        widget.configure({ auto: 'onfocus', hideFooter: true, hideLogo: true });
+      });
+    }
+
     var cf = el('div', { 'class': 'field consent-field' });
     var consent = el('div', { 'class': 'consent' });
     consent.appendChild(el('input', { type: 'checkbox', id: 'f-consent', name: 'consent', 'aria-describedby': 'err-consent' }));
@@ -236,23 +270,38 @@
 
       if (form.elements.web_site.value) { gracias(slug, !ENDPOINT); return; }
 
-      var espera = Math.max(0, MIN_MS - (Date.now() - t0));
-      setTimeout(function () {
-        if (!ENDPOINT) { setTimeout(function () { gracias(slug, true); }, 500); return; }
-        fetch(ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: slug, datos: datos, consentimiento: true, t: Date.now() - t0 }),
-          credentials: 'omit',
-          referrerPolicy: 'no-referrer'
-        }).then(function (r) {
-          if (r.ok) gracias(slug, false);
-          else if (r.status === 429) fail('Has enviado demasiadas solicitudes. Inténtalo de nuevo en unos minutos.');
-          else fail('No hemos podido enviar tu solicitud. Inténtalo de nuevo en unos minutos.');
-        }).catch(function () {
-          fail('No hemos podido conectar. Comprueba tu conexión e inténtalo de nuevo.');
-        });
-      }, espera);
+      function reiniciarAltcha() { if (widget) { try { widget.reset(); } catch (e) { /* sin widget */ } } }
+      function fallo(msg) { reiniciarAltcha(); fail(msg); }
+
+      obtenerAltcha(widget, form).then(function (payload) {
+        if (ENDPOINT && !payload) {
+          fallo('No hemos podido comprobar que eres una persona. Vuelve a intentarlo.');
+          return;
+        }
+        var espera = Math.max(0, MIN_MS - (Date.now() - t0));
+        setTimeout(function () {
+          if (!ENDPOINT) { setTimeout(function () { gracias(slug, true); }, 500); return; }
+          fetch(ENDPOINT + '/lead', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug: slug, datos: datos, consentimiento: true, t: Date.now() - t0, altcha: payload }),
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer'
+          }).then(function (r) {
+            if (r.ok) { gracias(slug, false); return; }
+            return r.json().catch(function () { return {}; }).then(function (cuerpo) {
+              var code = (cuerpo && cuerpo.code) || '';
+              if (code === 'limite_diario') fallo(nombre + ' no puede recibir más solicitudes hoy. Inténtalo de nuevo mañana.');
+              else if (r.status === 429) fallo('Has enviado demasiadas solicitudes. Inténtalo de nuevo en unos minutos.');
+              else if (code.indexOf('altcha') === 0) fallo('La comprobación ha caducado. Pulsa de nuevo en "Enviar solicitud".');
+              else if (code.indexOf('datos_') === 0) fallo('Revisa los datos del formulario e inténtalo de nuevo.');
+              else fallo('No hemos podido enviar tu solicitud. Inténtalo de nuevo en unos minutos.');
+            });
+          }).catch(function () {
+            fallo('No hemos podido conectar. Comprueba tu conexión e inténtalo de nuevo.');
+          });
+        }, espera);
+      });
     });
   }
 
