@@ -28,6 +28,11 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
       else if (fn === 'reservar_lead_ref') { out = estado.contador < limite; if (out) { estado.contador += 1; estado.registro.set(a.p_ref, { slug: a.p_slug, estado: 'pendiente' }); } }
       else if (fn === 'confirmar_lead_ref') { Object.assign(estado.registro.get(a.p_ref), { estado: 'enviado', mensaje: a.p_mensaje }); out = null; }
       else if (fn === 'fallar_lead_ref') { estado.registro.get(a.p_ref).estado = 'error'; estado.contador = Math.max(0, estado.contador - 1); out = null; }
+      else if (fn === 'marcar_conversion') {
+        const reg = estado.registro.get(a.p_ref);
+        out = !!reg && (a.p_conversion === 'venta' || a.p_conversion === 'sin_venta');
+        if (out) Object.assign(reg, { conversion: a.p_conversion });
+      }
       return { ok: true, status: 200, json: async () => out };
     }
     throw new Error('fetch inesperado: ' + u);
@@ -73,6 +78,8 @@ async function enviar(handle, over = {}, ip = '2.2.2.2') {
 }
 
 const codigo = (r) => JSON.parse(r.body).code;
+const confirmar = (handle, body, ip = '20.20.20.1', headers = cab) =>
+  handle({ method: 'POST', path: '/confirmar', headers, body: JSON.stringify(body), ip });
 
 test('reto ALTCHA: firmado y con caducidad', async () => {
   const { handle } = entorno();
@@ -121,6 +128,45 @@ test('trazabilidad: el lead queda registrado como enviado con id de SES y su ref
   assert.deepEqual(Object.keys(reg).sort(), ['estado', 'mensaje', 'slug']);
   assert.ok(estado.correos[0].text.includes('Referencia: ' + ref.slice(0, 8).toUpperCase()));
   assert.ok(estado.correos[0].html.includes('https://candyads.es/assets/candyads-icono.png'), 'el correo lleva el logo oficial');
+  const enlaceVenta = `https://candyads.es/confirmar.html?ref=${ref}&r=venta`;
+  const enlaceSinVenta = `https://candyads.es/confirmar.html?ref=${ref}&r=sin_venta`;
+  assert.ok(estado.correos[0].text.includes(enlaceVenta), 'el texto lleva el enlace de confirmar venta');
+  assert.ok(estado.correos[0].text.includes(enlaceSinVenta), 'el texto lleva el enlace de confirmar sin venta');
+  // En el HTML el "&" de la URL va escapado a "&amp;", como corresponde dentro de un atributo href.
+  assert.ok(estado.correos[0].html.includes(enlaceVenta.replace('&', '&amp;')), 'el html lleva el enlace de confirmar venta');
+  assert.ok(estado.correos[0].html.includes(enlaceSinVenta.replace('&', '&amp;')), 'el html lleva el enlace de confirmar sin venta');
+});
+
+test('confirmación de venta: un clic desde el correo marca el registro por su referencia', async () => {
+  const { handle, estado } = entorno();
+  await enviar(handle);
+  const [ref] = [...estado.registro.keys()];
+
+  const r = await confirmar(handle, { ref, conversion: 'venta' });
+  assert.equal(r.statusCode, 200);
+  assert.equal(estado.registro.get(ref).conversion, 'venta');
+
+  // Se puede cambiar de opinión: no rompe nada llamarlo otra vez con otro valor.
+  const r2 = await confirmar(handle, { ref, conversion: 'sin_venta' });
+  assert.equal(r2.statusCode, 200);
+  assert.equal(estado.registro.get(ref).conversion, 'sin_venta');
+});
+
+test('confirmación de venta: referencia desconocida da 404, valores inválidos dan 400', async () => {
+  const { handle } = entorno();
+  const desconocida = await confirmar(handle, { ref: '11111111-1111-4111-8111-111111111111', conversion: 'venta' });
+  assert.equal(desconocida.statusCode, 404);
+  assert.equal(codigo(desconocida), 'no_encontrado');
+
+  assert.equal(codigo(await confirmar(handle, { ref: 'no-es-un-uuid', conversion: 'venta' })), 'ref');
+  assert.equal(codigo(await confirmar(handle, { ref: '11111111-1111-4111-8111-111111111111', conversion: 'quizas' })), 'conversion');
+  assert.equal(codigo(await confirmar(handle, {})), 'ref');
+});
+
+test('confirmación de venta: origen no permitido da 403', async () => {
+  const { handle } = entorno();
+  const r = await confirmar(handle, { ref: '11111111-1111-4111-8111-111111111111', conversion: 'venta' }, '20.20.20.2', { origin: 'https://malo.example' });
+  assert.equal(r.statusCode, 403);
 });
 
 test('reutilizar la misma solución ALTCHA es rechazado', async () => {
@@ -255,6 +301,8 @@ test('sin configuración completa el backend falla cerrado (no emite retos ni ac
   assert.equal(JSON.parse(r1.body).code, 'config');
   const r2 = await handle({ method: 'POST', path: '/lead', headers: cab, body: '{}', ip: '1.1.1.2' });
   assert.equal(r2.statusCode, 500);
+  const r3 = await handle({ method: 'POST', path: '/confirmar', headers: cab, body: '{}', ip: '1.1.1.3' });
+  assert.equal(r3.statusCode, 500);
   assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'));
   assert.ok(!estado.logs.join('').includes('sb_secret'));
 });

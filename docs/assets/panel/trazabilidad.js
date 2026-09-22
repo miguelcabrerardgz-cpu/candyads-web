@@ -6,6 +6,7 @@
   var hora = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   var diaMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
   var ETQ = { enviado: 'Enviado', error: 'Error de envío', pendiente: 'Sin confirmar' };
+  var CONV = { pendiente: '—', venta: '✅ Venta', sin_venta: '❌ Sin venta' };
 
   function sumaDias(f, n) {
     var d = new Date(f + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
@@ -70,7 +71,7 @@
 
     // Vista de un día (hora de Madrid): un lead por fila, con hora exacta, referencia y estado.
     function verDia(fecha, slug) {
-      ctx.api('/rest/v1/leads_registro?select=ref,anunciante_slug,recibido_at,estado&recibido_at=gte.' + sumaDias(fecha, -1) +
+      ctx.api('/rest/v1/leads_registro?select=ref,anunciante_slug,recibido_at,estado,conversion&recibido_at=gte.' + sumaDias(fecha, -1) +
           'T00:00:00Z&recibido_at=lt.' + sumaDias(fecha, 2) + 'T00:00:00Z&order=recibido_at.asc&limit=1000')
         .then(function (r) {
           if (r.status === 401) { ctx.sesionCaducada(); return null; }
@@ -109,15 +110,17 @@
       cont.appendChild(nav);
 
       var c = { enviado: 0, error: 0, pendiente: 0 };
-      rows.forEach(function (r) { c[r.estado] += 1; });
+      var conv = { pendiente: 0, venta: 0, sin_venta: 0 };
+      rows.forEach(function (r) { c[r.estado] += 1; conv[r.conversion] += 1; });
       cont.appendChild(el('p', 'p-cifras',
-        c.enviado + ' enviados' + (c.error ? ' · ' + c.error + ' con error' : '') + (c.pendiente ? ' · ' + c.pendiente + ' sin confirmar' : '')));
+        c.enviado + ' enviados' + (c.error ? ' · ' + c.error + ' con error' : '') + (c.pendiente ? ' · ' + c.pendiente + ' sin confirmar' : '') +
+        (conv.venta || conv.sin_venta ? ' · ' + conv.venta + ' venta / ' + conv.sin_venta + ' sin venta' : '')));
       if (c.error || c.pendiente) cont.appendChild(el('div', 'p-err', 'Hay leads que no constan como enviados. Revísalos antes de dar el día por bueno.'));
 
       if (!rows.length) { cont.appendChild(el('p', 'lead', 'Sin leads este día.')); return; }
-      cont.appendChild(tabla(['Hora', 'Ref.', 'Anunciante', 'Estado'],
-        rows.map(function (r) { return [hora.format(new Date(r.recibido_at)), r.ref.slice(0, 8).toUpperCase(), r.anunciante_slug, ETQ[r.estado]]; })));
-      cont.appendChild(el('p', 'p-note', 'Hora de Madrid. La referencia aparece también en el correo que recibe el anunciante. “Enviado” significa que Amazon SES aceptó el mensaje.'));
+      cont.appendChild(tabla(['Hora', 'Ref.', 'Anunciante', 'Estado', 'Conversión'],
+        rows.map(function (r) { return [hora.format(new Date(r.recibido_at)), r.ref.slice(0, 8).toUpperCase(), r.anunciante_slug, ETQ[r.estado], CONV[r.conversion]]; })));
+      cont.appendChild(el('p', 'p-note', 'Hora de Madrid. La referencia aparece también en el correo que recibe el anunciante. “Enviado” significa que Amazon SES aceptó el mensaje. La conversión la marca el propio anunciante desde el correo, con un clic.'));
     }
 
     cargar();

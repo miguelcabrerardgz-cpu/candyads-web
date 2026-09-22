@@ -3,6 +3,7 @@ import { construirCorreo } from './email.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
+const REF_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_BODY = 8192;
 const MIN_MS = 2000;
 const RL_MAX = 5;
@@ -157,7 +158,7 @@ export function createHandler(deps) {
       const reservado = await rpc('reservar_lead_ref', { p_slug: slug, p_ref: ref });
       if (reservado !== true) return fin(429, 'limite_diario', slug);
 
-      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase(), sitio: env.SITE_URL });
+      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase(), refCompleta: ref, sitio: env.SITE_URL });
       let envio;
       try {
         envio = await sendEmail({ from: env.SES_FROM, to: destino, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });
@@ -175,6 +176,36 @@ export function createHandler(deps) {
     return fin(200, 'ok', slug);
   }
 
+  // El anunciante confirma desde el correo, con un clic, si ese lead terminó en venta. Solo identifica el
+  // envío por su referencia aleatoria: no hay dato de la persona en esta ruta.
+  async function confirmar(req, cors) {
+    const fin = (status, code) => {
+      log.info(JSON.stringify({ evt: 'confirmar', status, code }));
+      return json(status, status === 200 ? { ok: true } : { ok: false, code }, cors);
+    };
+
+    if (req.body.length > MAX_BODY) return fin(413, 'demasiado_grande');
+    let b;
+    try { b = JSON.parse(req.body); } catch { return fin(400, 'json'); }
+    if (!b || typeof b !== 'object') return fin(400, 'json');
+
+    if (excedeLimite(req.ip || 'desconocida')) return fin(429, 'limite_ip');
+
+    const ref = String(b.ref || '');
+    if (!REF_RE.test(ref)) return fin(400, 'ref');
+    const conversion = String(b.conversion || '');
+    if (conversion !== 'venta' && conversion !== 'sin_venta') return fin(400, 'conversion');
+
+    try {
+      const ok = await rpc('marcar_conversion', { p_ref: ref, p_conversion: conversion });
+      if (ok !== true) return fin(404, 'no_encontrado');
+    } catch (e) {
+      log.error(JSON.stringify({ evt: 'confirmar_error', error: (e && e.message) || 'error' }));
+      return fin(500, 'interno');
+    }
+    return fin(200, 'ok');
+  }
+
   return async function handle(req) {
     const origin = req.headers.origin || '';
     const permitido = origin === env.ALLOWED_ORIGIN;
@@ -186,7 +217,7 @@ export function createHandler(deps) {
     if (!permitido) return json(403, { ok: false, code: 'origen' });
 
     const faltan = ENV_OBLIGATORIAS.filter((k) => !env[k]);
-    if (faltan.length && (req.path.endsWith('/challenge') || req.path.endsWith('/lead'))) {
+    if (faltan.length && (req.path.endsWith('/challenge') || req.path.endsWith('/lead') || req.path.endsWith('/confirmar'))) {
       log.error(JSON.stringify({ evt: 'config_incompleta', faltan }));
       return json(500, { ok: false, code: 'config' }, cors);
     }
@@ -196,6 +227,7 @@ export function createHandler(deps) {
       catch (e) { log.error(JSON.stringify({ evt: 'reto_error', error: (e && e.name) || 'error' })); return json(500, { ok: false, code: 'interno' }, cors); }
     }
     if (req.method === 'POST' && req.path.endsWith('/lead')) return lead(req, cors);
+    if (req.method === 'POST' && req.path.endsWith('/confirmar')) return confirmar(req, cors);
     return json(404, { ok: false, code: 'ruta' }, cors);
   };
 }

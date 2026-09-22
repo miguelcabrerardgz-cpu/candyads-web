@@ -318,6 +318,73 @@
     });
   }
 
+  var REF_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  // Enlace de un clic que llega en el correo del lead: el anunciante confirma si terminó en venta.
+  // Solo lleva la referencia aleatoria del envío, sin ningún dato de la persona.
+  function pintarConfirmar(app, ref, r) {
+    app.textContent = '';
+    app.appendChild(el('p', { 'class': 'eyebrow' }, 'Candy Ads'));
+    app.appendChild(el('h1', null, r === 'venta' ? '¿Confirmas que fue venta?' : '¿Confirmas que no fue venta, de momento?'));
+    app.appendChild(el('p', { 'class': 'lead' },
+      'Lo anotamos en el sistema de Candy Ads. No identifica quién era el contacto: solo dice si este envío concreto terminó en venta.'));
+
+    var formErr = el('div', { 'class': 'form-err', role: 'alert' });
+    app.appendChild(formErr);
+
+    var btn = el('button', { type: 'button', 'class': 'btn' }, 'Confirmar');
+    app.appendChild(btn);
+
+    var pCambiar = el('p', { 'class': 'privacy-note' });
+    pCambiar.appendChild(el('a', { href: '?ref=' + encodeURIComponent(ref) + '&r=' + (r === 'venta' ? 'sin_venta' : 'venta') },
+      r === 'venta' ? 'Me he equivocado: no fue venta' : 'Me he equivocado: sí fue venta'));
+    app.appendChild(pCambiar);
+
+    function hecho() {
+      app.textContent = '';
+      app.appendChild(el('div', { 'class': 'tick', 'aria-hidden': 'true' }, '✓'));
+      app.appendChild(el('h1', null, '¡Anotado!'));
+      app.appendChild(el('p', { 'class': 'lead' }, 'Gracias por confirmarlo.'));
+    }
+
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      btn.textContent = 'Enviando…';
+      fetch(ENDPOINT + '/confirmar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: ref, conversion: r }),
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer'
+      }).then(function (resp) {
+        if (resp.ok) { hecho(); return; }
+        formErr.textContent = resp.status === 404
+          ? 'Este enlace ya no es válido.'
+          : 'No hemos podido guardarlo. Vuelve a intentarlo en unos minutos.';
+        formErr.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Confirmar';
+      }).catch(function () {
+        formErr.textContent = 'No hemos podido conectar. Comprueba tu conexión e inténtalo de nuevo.';
+        formErr.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Confirmar';
+      });
+    });
+  }
+
+  function initConfirmar() {
+    var app = $('app');
+    var q = new URLSearchParams(location.search);
+    var ref = String(q.get('ref') || '');
+    var r = String(q.get('r') || '');
+    if (!REF_RE.test(ref) || (r !== 'venta' && r !== 'sin_venta')) {
+      estadoVacio(app, 'Este enlace no es válido', 'Comprueba que lo has abierto tal cual venía en el correo.');
+      return;
+    }
+    pintarConfirmar(app, ref, r);
+  }
+
   function initGracias() {
     var params = new URLSearchParams(location.search);
     var slug = getSlug();
@@ -333,4 +400,5 @@
   var page = document.body.getAttribute('data-page');
   if (page === 'lead') initLead();
   else if (page === 'gracias') initGracias();
+  else if (page === 'confirmar') initConfirmar();
 })();

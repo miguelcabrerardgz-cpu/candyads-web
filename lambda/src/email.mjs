@@ -17,11 +17,20 @@ const AVISO = 'Este mensaje contiene datos personales que la persona interesada 
   'Tú eres el responsable de su tratamiento.';
 
 // Devuelve el correo listo para enviar. No incluye datos personales en el asunto.
-export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, sitio }) {
+// `refCompleta`, si se da, añade dos enlaces de un clic (sin login) para que el anunciante confirme si el
+// contacto terminó en venta. El enlace solo lleva la referencia aleatoria: no identifica a la persona.
+export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, refCompleta, sitio }) {
   const base = String(sitio || 'https://candyads.es').replace(/\/+$/, '');
   const filas = Object.keys(datos)
     .filter((id) => CATALOGO[id] && datos[id])
     .map((id) => ({ etiqueta: CATALOGO[id].label, valor: datos[id] }));
+
+  const confirmar = refCompleta
+    ? {
+        venta: `${base}/confirmar.html?ref=${encodeURIComponent(refCompleta)}&r=venta`,
+        sinVenta: `${base}/confirmar.html?ref=${encodeURIComponent(refCompleta)}&r=sin_venta`
+      }
+    : null;
 
   const texto = [
     `Nuevo contacto para ${nombreAnunciante}`,
@@ -30,7 +39,12 @@ export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, si
     '',
     ...filas.map((f) => `${f.etiqueta}: ${f.valor}`),
     '',
-    AVISO
+    AVISO,
+    ...(confirmar
+      ? ['', '¿Este contacto terminó en venta? Un clic, no hace falta contestar:',
+        `Sí, fue venta: ${confirmar.venta}`,
+        `No, de momento no: ${confirmar.sinVenta}`]
+      : [])
   ].join('\n');
 
   const html = `<!DOCTYPE html><html lang="es"><body style="margin:0;background:#F7F8FC;font-family:Arial,Helvetica,sans-serif;color:#2D2D3A;">
@@ -43,6 +57,7 @@ export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, si
 ${filas.map((f) => `<tr><td style="padding:9px 0;border-top:1px solid #E4E4EF;font-size:13px;color:#6B6B80;width:38%;vertical-align:top;">${esc(f.etiqueta)}</td><td style="padding:9px 0;border-top:1px solid #E4E4EF;font-size:15px;color:#0F0F14;white-space:pre-wrap;">${esc(f.valor)}</td></tr>`).join('\n')}
 </table>
 <p style="margin:18px 0 0;font-size:12px;color:#6B6B80;line-height:1.5;">${esc(AVISO)}</p>
+${confirmar ? `<p style="margin:14px 0 0;padding-top:14px;border-top:1px solid #E4E4EF;font-size:11px;color:#9CA3AF;">&iquest;Termin&oacute; en venta? <a href="${esc(confirmar.venta)}" style="color:#7C3AED;">S&iacute;</a> &middot; <a href="${esc(confirmar.sinVenta)}" style="color:#7C3AED;">No, de momento</a></p>` : ''}
 </div></div></body></html>`;
 
   return {
