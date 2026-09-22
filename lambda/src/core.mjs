@@ -1,5 +1,5 @@
 import { validarDatos } from './campos.mjs';
-import { construirCorreo } from './email.mjs';
+import { construirCorreo, construirCorreoRecordatorio } from './email.mjs';
 import { validarContacto, construirCorreoContacto } from './contacto.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -241,7 +241,51 @@ export function createHandler(deps) {
     return fin(200, 'ok');
   }
 
-  return async function handle(req) {
+  // Recordatorios de confirmación de venta (15 y 30 días). No lo dispara nadie por HTTP: lo invoca una
+  // tarea programada (EventBridge) directamente sobre la Lambda. Recorre los leads que Supabase señala
+  // como pendientes, envía como mucho un correo por lead en esta pasada, y marca cada aviso enviado para
+  // no repetirlo. Un fallo en un lead no bloquea los demás.
+  async function procesarRecordatorios() {
+    const faltan = ENV_OBLIGATORIAS.filter((k) => !env[k]);
+    if (faltan.length) {
+      log.error(JSON.stringify({ evt: 'config_incompleta', faltan }));
+      return { procesados: 0, enviados: 0, errores: 0 };
+    }
+
+    let filas;
+    try {
+      filas = await rpc('leads_pendientes_recordatorio', {});
+    } catch (e) {
+      log.error(JSON.stringify({ evt: 'recordatorios_error', error: (e && e.message) || 'error' }));
+      return { procesados: 0, enviados: 0, errores: 1 };
+    }
+
+    let enviados = 0;
+    let errores = 0;
+    for (const fila of filas || []) {
+      try {
+        const cfg = await cargarConfig(fila.anunciante_slug);
+        const nombre = (cfg && cfg.nombre) || fila.anunciante_slug;
+        const correo = construirCorreoRecordatorio({
+          nombreAnunciante: nombre,
+          referencia: fila.referencia,
+          refCompleta: fila.ref,
+          sitio: env.SITE_URL,
+          dias: fila.tipo
+        });
+        await sendEmail({ from: env.SES_FROM, to: fila.destino, subject: correo.subject, text: correo.text, html: correo.html });
+        await rpc('marcar_recordatorio_enviado', { p_ref: fila.ref, p_tipo: fila.tipo });
+        enviados += 1;
+        log.info(JSON.stringify({ evt: 'recordatorio', slug: fila.anunciante_slug, tipo: fila.tipo, status: 200 }));
+      } catch (e) {
+        errores += 1;
+        log.error(JSON.stringify({ evt: 'recordatorio_error', slug: fila.anunciante_slug, tipo: fila.tipo, error: (e && e.name) || (e && e.message) || 'error' }));
+      }
+    }
+    return { procesados: (filas || []).length, enviados, errores };
+  }
+
+  async function handle(req) {
     const origin = req.headers.origin || '';
     const permitido = origin === env.ALLOWED_ORIGIN;
     const cors = permitido ? corsHeaders(origin) : {};
@@ -270,5 +314,7 @@ export function createHandler(deps) {
     if (req.method === 'POST' && req.path.endsWith('/confirmar')) return confirmar(req, cors);
     if (req.method === 'POST' && req.path.endsWith('/contacto')) return contactar(req, cors);
     return json(404, { ok: false, code: 'ruta' }, cors);
-  };
+  }
+
+  return { handle, procesarRecordatorios };
 }

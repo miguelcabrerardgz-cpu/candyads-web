@@ -67,3 +67,43 @@ ${confirmar ? `<p style="margin:14px 0 0;padding-top:14px;border-top:1px solid #
     replyTo: datos.email || undefined
   };
 }
+
+// Correo de recordatorio (15 o 30 días) para un lead que sigue sin confirmar si fue venta. Los mismos
+// dos enlaces que el correo original; no lleva ningún dato de la persona, solo la referencia del envío.
+export function construirCorreoRecordatorio({ nombreAnunciante, referencia, refCompleta, sitio, dias }) {
+  const base = String(sitio || 'https://candyads.es').replace(/\/+$/, '');
+  const etiqueta = String(dias) === '30' ? '30 días' : '15 días';
+  const confirmar = {
+    venta: `${base}/confirmar.html?ref=${encodeURIComponent(refCompleta)}&r=venta`,
+    sinVenta: `${base}/confirmar.html?ref=${encodeURIComponent(refCompleta)}&r=sin_venta`
+  };
+
+  const texto = [
+    `Recordatorio (${etiqueta}): un contacto sigue sin confirmar`,
+    `Anunciante: ${nombreAnunciante}`,
+    `Referencia: ${referencia}`,
+    '',
+    `Hace ${etiqueta} recibiste un contacto (referencia ${referencia}) a través de tu sobre de Candy Ads y todavía no nos has dicho si terminó en venta.`,
+    '',
+    `Sí, fue venta: ${confirmar.venta}`,
+    `No, de momento no: ${confirmar.sinVenta}`,
+    '',
+    'Si ya lo marcaste, ignora este correo.'
+  ].join('\n');
+
+  const html = `<!DOCTYPE html><html lang="es"><body style="margin:0;background:#F7F8FC;font-family:Arial,Helvetica,sans-serif;color:#2D2D3A;">
+<div style="max-width:560px;margin:0 auto;padding:24px;">
+<div style="background:#ffffff;border:1px solid #E4E4EF;border-radius:12px;padding:24px;">
+<p style="margin:0 0 14px;line-height:0;"><img src="${esc(base)}/assets/candyads-icono.png" alt="Candy Ads" width="44" height="44" style="display:inline-block;vertical-align:middle;border:0;"><img src="${esc(base)}/assets/candyads-logotipo.jpg" alt="" width="74" height="31" style="display:inline-block;vertical-align:middle;border:0;margin-left:-4px;"></p>
+<h1 style="margin:0 0 6px;font-size:20px;color:#0F0F14;">&iquest;Qu&eacute; tal fue este contacto?</h1>
+<p style="margin:0 0 14px;font-size:14px;color:#374151;">Hace <strong>${esc(etiqueta)}</strong> recibiste una solicitud de contacto (ref. ${esc(referencia)}) para <strong>${esc(nombreAnunciante)}</strong> y todav&iacute;a no la has marcado como venta o no venta.</p>
+<p style="margin:18px 0;text-align:center;"><a href="${esc(confirmar.venta)}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;margin:0 6px;">S&iacute;, fue venta</a><a href="${esc(confirmar.sinVenta)}" style="display:inline-block;background:#fff;color:#7C3AED;border:1px solid #7C3AED;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:700;margin:0 6px;">No, de momento</a></p>
+<p style="margin:14px 0 0;font-size:12px;color:#9CA3AF;">Si ya lo marcaste, ignora este correo.</p>
+</div></div></body></html>`;
+
+  return {
+    subject: `Recordatorio (${etiqueta}): ¿confirmas este contacto?`,
+    text: texto,
+    html
+  };
+}

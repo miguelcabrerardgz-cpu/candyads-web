@@ -7,7 +7,7 @@ import { createHandler } from './core.mjs';
 // no hay claves de AWS de larga duración.
 const ses = new SESv2Client({});
 
-const handle = createHandler({
+const { handle, procesarRecordatorios } = createHandler({
   env: process.env,
   altcha: { createChallenge, verifySolution, randomInt, deriveKey },
   sendEmail: async ({ from, to, replyTo, subject, text, html }) => {
@@ -26,7 +26,14 @@ const handle = createHandler({
   }
 });
 
+// Misma Lambda, dos formas de invocarla: por su Function URL (petición HTTP normal, con
+// requestContext.http) o directamente por una tarea programada de EventBridge (sin requestContext, con
+// {tarea:'recordatorios'} como payload) que dispara los recordatorios de 15/30 días. EventBridge no pasa
+// por la Function URL: invoca la función directamente, así que este es el único punto de entrada posible.
 export const handler = async (event) => {
+  if (event && event.tarea === 'recordatorios') {
+    return procesarRecordatorios();
+  }
   const headers = {};
   for (const [k, v] of Object.entries(event.headers || {})) headers[k.toLowerCase()] = v;
   let body = event.body || '';

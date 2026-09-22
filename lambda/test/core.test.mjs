@@ -25,13 +25,33 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
       if (fn === 'destino_de') out = a.p_slug === 'lacasa-piloto' ? destino : null;
       else if (fn === 'consumir_reto') { out = !estado.retos.has(a.p_huella); estado.retos.add(a.p_huella); }
       else if (fn === 'reservar_lead') { out = estado.contador < limite; if (out) estado.contador += 1; }
-      else if (fn === 'reservar_lead_ref') { out = estado.contador < limite; if (out) { estado.contador += 1; estado.registro.set(a.p_ref, { slug: a.p_slug, estado: 'pendiente' }); } }
+      else if (fn === 'reservar_lead_ref') { out = estado.contador < limite; if (out) { estado.contador += 1; estado.registro.set(a.p_ref, { slug: a.p_slug, estado: 'pendiente', recibidoEn: estado.reloj }); } }
       else if (fn === 'confirmar_lead_ref') { Object.assign(estado.registro.get(a.p_ref), { estado: 'enviado', mensaje: a.p_mensaje }); out = null; }
       else if (fn === 'fallar_lead_ref') { estado.registro.get(a.p_ref).estado = 'error'; estado.contador = Math.max(0, estado.contador - 1); out = null; }
       else if (fn === 'marcar_conversion') {
         const reg = estado.registro.get(a.p_ref);
         out = !!reg && (a.p_conversion === 'venta' || a.p_conversion === 'sin_venta');
         if (out) Object.assign(reg, { conversion: a.p_conversion });
+      }
+      else if (fn === 'leads_pendientes_recordatorio') {
+        const DIA = 24 * 60 * 60 * 1000;
+        out = [];
+        for (const [ref, reg] of estado.registro) {
+          if (reg.estado !== 'enviado' || (reg.conversion && reg.conversion !== 'pendiente')) continue;
+          const edad = estado.reloj - reg.recibidoEn;
+          let tipo = null;
+          if (edad >= 30 * DIA && !reg.recordatorio30) tipo = '30';
+          else if (edad >= 15 * DIA && !reg.recordatorio15) tipo = '15';
+          if (tipo) out.push({ ref, anunciante_slug: reg.slug, destino, referencia: ref.slice(0, 8).toUpperCase(), recibido_at: new Date(reg.recibidoEn).toISOString(), tipo });
+        }
+      }
+      else if (fn === 'marcar_recordatorio_enviado') {
+        const reg = estado.registro.get(a.p_ref);
+        if (reg) {
+          if (a.p_tipo === '15') reg.recordatorio15 = true;
+          else if (a.p_tipo === '30') { reg.recordatorio30 = true; reg.recordatorio15 = true; }
+        }
+        out = null;
       }
       return { ok: true, status: 200, json: async () => out };
     }
@@ -43,7 +63,7 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
     error: (m) => estado.logs.push(String(m))
   };
 
-  const handle = createHandler({
+  const { handle, procesarRecordatorios } = createHandler({
     env: {
       ALLOWED_ORIGIN: ORIGIN, SITE_URL: ORIGIN, SUPABASE_URL: 'https://x.supabase.co',
       SUPABASE_SECRET_KEY: 'sb_secret_test', ALTCHA_HMAC_SECRET: 'secreto-a', ALTCHA_HMAC_KEY_SECRET: 'secreto-b',
@@ -55,7 +75,7 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
     now: () => estado.reloj,
     log
   });
-  return { handle, estado };
+  return { handle, procesarRecordatorios, estado };
 }
 
 const cab = { origin: ORIGIN };
@@ -131,7 +151,7 @@ test('trazabilidad: el lead queda registrado como enviado con id de SES y su ref
   assert.equal(reg.estado, 'enviado');
   assert.equal(reg.mensaje, 'ses-msg-1');
   assert.equal(reg.slug, 'lacasa-piloto');
-  assert.deepEqual(Object.keys(reg).sort(), ['estado', 'mensaje', 'slug']);
+  assert.deepEqual(Object.keys(reg).sort(), ['estado', 'mensaje', 'recibidoEn', 'slug']);
   assert.ok(estado.correos[0].text.includes('Referencia: ' + ref.slice(0, 8).toUpperCase()));
   assert.ok(estado.correos[0].html.includes('https://candyads.es/assets/candyads-icono.png'), 'el correo lleva el logo oficial');
   const enlaceVenta = `https://candyads.es/confirmar.html?ref=${ref}&r=venta`;
@@ -296,7 +316,7 @@ test('caracteres de control se eliminan y el email no admite saltos de línea', 
 
 test('sin configuración completa el backend falla cerrado (no emite retos ni acepta leads)', async () => {
   const estado = { logs: [] };
-  const handle = createHandler({
+  const { handle, procesarRecordatorios } = createHandler({
     env: { ALLOWED_ORIGIN: ORIGIN, SITE_URL: ORIGIN, SUPABASE_URL: 'https://x.supabase.co', SES_FROM: 'a@b.es' },
     altcha: { createChallenge, verifySolution, randomInt, deriveKey },
     sendEmail: async () => { throw new Error('no debería enviar'); },
@@ -311,6 +331,10 @@ test('sin configuración completa el backend falla cerrado (no emite retos ni ac
   assert.equal(r3.statusCode, 500);
   assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'));
   assert.ok(!estado.logs.join('').includes('sb_secret'));
+
+  const resultado = await procesarRecordatorios();
+  assert.deepEqual(resultado, { procesados: 0, enviados: 0, errores: 0 });
+  assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'), 'procesarRecordatorios también falla cerrado');
 });
 
 test('contacto: camino feliz, un email a CONTACT_TO con "Responder a" el remitente, sin datos personales en logs', async () => {
@@ -353,7 +377,7 @@ test('contacto: origen no permitido da 403; falta CONTACT_TO falla cerrado', asy
   assert.equal(r.statusCode, 403);
 
   const estado2 = { logs: [] };
-  const handleSinContacto = createHandler({
+  const { handle: handleSinContacto } = createHandler({
     env: { ALLOWED_ORIGIN: ORIGIN, SES_FROM: 'a@b.es' },
     altcha: { createChallenge, verifySolution, randomInt, deriveKey },
     sendEmail: async () => { throw new Error('no debería enviar'); },
@@ -362,4 +386,104 @@ test('contacto: origen no permitido da 403; falta CONTACT_TO falla cerrado', asy
   const r2 = await handleSinContacto({ method: 'POST', path: '/contacto', headers: cab, body: '{}', ip: '31.3.1.2' });
   assert.equal(r2.statusCode, 500);
   assert.equal(JSON.parse(r2.body).code, 'config');
+});
+
+const DIA = 24 * 60 * 60 * 1000;
+
+test('recordatorios: no se envía nada antes de los 15 días', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  estado.reloj += 14 * DIA;
+  const r = await procesarRecordatorios();
+  assert.deepEqual(r, { procesados: 0, enviados: 0, errores: 0 });
+  assert.equal(estado.correos.length, 1, 'solo el correo original del lead');
+});
+
+test('recordatorios: a los 15 días se envía uno, y no se repite al día siguiente', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  const [ref] = [...estado.registro.keys()];
+  estado.reloj += 15 * DIA;
+
+  const r1 = await procesarRecordatorios();
+  assert.deepEqual(r1, { procesados: 1, enviados: 1, errores: 0 });
+  assert.equal(estado.correos.length, 2);
+  const recordatorio = estado.correos[1];
+  assert.equal(recordatorio.to, 'jose@lacasa.example');
+  assert.ok(recordatorio.subject.includes('15 días'));
+  assert.ok(recordatorio.text.includes('confirmar.html?ref=' + ref + '&r=venta'));
+  assert.ok(recordatorio.text.includes('confirmar.html?ref=' + ref + '&r=sin_venta'));
+  assert.equal(estado.registro.get(ref).recordatorio15, true);
+
+  estado.reloj += 1 * DIA;
+  const r2 = await procesarRecordatorios();
+  assert.deepEqual(r2, { procesados: 0, enviados: 0, errores: 0 }, 'no se repite el de 15 días');
+  assert.equal(estado.correos.length, 2);
+});
+
+test('recordatorios: a los 30 días se envía el segundo aviso', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  const [ref] = [...estado.registro.keys()];
+  estado.reloj += 15 * DIA;
+  await procesarRecordatorios();
+  estado.reloj += 15 * DIA; // día 30
+  const r = await procesarRecordatorios();
+  assert.deepEqual(r, { procesados: 1, enviados: 1, errores: 0 });
+  assert.equal(estado.correos.length, 3);
+  assert.ok(estado.correos[2].subject.includes('30 días'));
+  assert.equal(estado.registro.get(ref).recordatorio30, true);
+
+  estado.reloj += 5 * DIA;
+  const r2 = await procesarRecordatorios();
+  assert.deepEqual(r2, { procesados: 0, enviados: 0, errores: 0 }, 'no se repite el de 30 días');
+});
+
+test('recordatorios: si nunca se envió el de 15 y ya han pasado 30 días, solo se envía el de 30 (no dos)', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  const [ref] = [...estado.registro.keys()];
+  estado.reloj += 40 * DIA; // se saltó por completo la ventana de los 15
+  const r = await procesarRecordatorios();
+  assert.deepEqual(r, { procesados: 1, enviados: 1, errores: 0 });
+  assert.ok(estado.correos[1].subject.includes('30 días'));
+  const reg = estado.registro.get(ref);
+  assert.equal(reg.recordatorio30, true);
+  assert.equal(reg.recordatorio15, true, 'se cierra también el de 15 para no reintentar en bucle');
+
+  const r2 = await procesarRecordatorios();
+  assert.deepEqual(r2, { procesados: 0, enviados: 0, errores: 0 });
+});
+
+test('recordatorios: un lead ya confirmado (venta o sin venta) no recibe recordatorios', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  const [ref] = [...estado.registro.keys()];
+  await confirmar(handle, { ref, conversion: 'sin_venta' });
+  estado.reloj += 40 * DIA;
+  const r = await procesarRecordatorios();
+  assert.deepEqual(r, { procesados: 0, enviados: 0, errores: 0 });
+  assert.equal(estado.correos.length, 1, 'solo el correo original');
+});
+
+test('recordatorios: un lead con error de envío original no cuenta (no llegó a "enviado")', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno({ sesFalla: true });
+  await enviar(handle);
+  estado.reloj += 40 * DIA;
+  const r = await procesarRecordatorios();
+  assert.deepEqual(r, { procesados: 0, enviados: 0, errores: 0 });
+});
+
+test('recordatorios: no llevan ningún dato personal del lead, solo referencia y anunciante', async () => {
+  const { handle, procesarRecordatorios, estado } = entorno();
+  await enviar(handle);
+  estado.reloj += 15 * DIA;
+  await procesarRecordatorios();
+  const recordatorio = estado.correos[1];
+  for (const p of PERSONALES) {
+    assert.ok(!recordatorio.text.includes(p), 'el recordatorio no debe llevar: ' + p);
+    assert.ok(!recordatorio.html.includes(p), 'el recordatorio (html) no debe llevar: ' + p);
+  }
+  const logs = estado.logs.join('\n');
+  for (const p of PERSONALES) assert.ok(!logs.includes(p));
 });
