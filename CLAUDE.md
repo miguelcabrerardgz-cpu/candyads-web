@@ -73,7 +73,7 @@ Fase 2 (formulario `/lead/<slug>`): hecho en `assets/lead.js` — casilla de con
 
 Fase 3 (hecha, publicada, desplegada): Formspree sustituido por la ruta `/contacto` de la misma Lambda + SES (ver arriba); ya no hay ninguna mención a Formspree en el repo. El formulario de la landing (`index.html`) llama a `ENDPOINT_CONTACTO + '/contacto'` igual que `lead.js` llama a `/lead`. Variable `CONTACT_TO=equipo@candyads.es` añadida en la consola de Lambda y zip subido el 2026-09-22. Pendiente: probar un envío real desde candyads.es y confirmar que llega.
 
-Fase 4 (pendiente): contrato de encargo/corresponsabilidad para firmar con cada anunciante (Parte I art. 26, Parte II art. 28) y demás documentos legales — fuera de `docs/` (repo público), en una carpeta no publicada o fuera del repo.
+Fase 4 (hecha, publicada): 5 plantillas en `legal/` (fuera de `docs/`, no publicado en el sitio, pero visible en el repo de GitHub por ser público) — `1-contrato-encargo-corresponsabilidad.md` (Parte I art. 26 + Parte II art. 28, Anexo II del documento 2), `2-contrato-comercial-publicidad.md` (Anexo I de condiciones particulares), `3-acuerdo-hosteleria.md`, `4-registro-actividades-tratamiento.md` (RAT, una ficha por actividad, documento vivo), `5-protocolo-brecha-seguridad.md`. Índice en `legal/README.md`. Todas son plantillas pendientes de revisión por un abogado antes de firmarse con nadie real. **El domicilio fiscal del titular se ha quitado a propósito de estos archivos** (el repo es público): vive solo fuera del repo, en `Desktop\candyads-abogado\domicilio-titular.md`; copiarlo a mano al rellenar/firmar cada contrato, nunca commitearlo.
 
 ## Convenciones
 
