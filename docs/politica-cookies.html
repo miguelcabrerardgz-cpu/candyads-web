@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Política de Cookies | Candy Ads</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Inter',system-ui,sans-serif;color:#2D2D3A;background:#fff;line-height:1.6;}
@@ -39,24 +38,24 @@ a:hover{text-decoration:underline;}
 </div></nav>
 <div class="legal-wrap">
 <h1>Política de Cookies</h1>
-<p class="meta">Última actualización: septiembre de 2026 &nbsp;·&nbsp; LSSI-CE Art. 22.2, RGPD y directrices de la AEPD</p>
+<p class="meta">Última actualización: 22 de septiembre de 2026 &nbsp;·&nbsp; LSSI-CE Art. 22.2, RGPD y directrices de la AEPD</p>
 
 <h2>1. Qué son las cookies</h2>
 <p>Las cookies son pequeños archivos de texto que un sitio web almacena en el dispositivo del usuario al visitarlo. Permiten recordar información entre visitas o recopilar datos sobre el comportamiento de navegación. Conforme al artículo 22.2 de la LSSI-CE y al RGPD, cualquier cookie no estrictamente técnica requiere el consentimiento previo e informado del usuario.</p>
 
-<h2>2. Cookies utilizadas en este sitio web</h2>
+<h2>2. Almacenamiento utilizado en este sitio web</h2>
+<p>Además de cookies propiamente dichas, este sitio usa <code>localStorage</code> del navegador para recordar una preferencia. El artículo 22.2 de la LSSI-CE se aplica por igual a las cookies y a cualquier otro dispositivo de almacenamiento y recuperación de datos en el equipo del usuario, así que <code>localStorage</code> se trata aquí con las mismas garantías.</p>
 <table>
-<tr><th>Cookie</th><th>Titular</th><th>Tipo</th><th>Finalidad</th><th>Duración</th></tr>
-<tr><td>ca_ck</td><td>Candy Ads (propia)</td><td>Técnica / Preferencias</td><td>Almacena la preferencia de consentimiento del usuario sobre el banner de cookies</td><td>1 año</td></tr>
-<tr><td>Cookies de sesión Formspree</td><td>Formspree Inc. (tercero)</td><td>Técnica necesaria</td><td>Necesarias para el correcto envío del formulario de contacto. Sin uso de seguimiento ni publicidad.</td><td>Sesión</td></tr>
+<tr><th>Nombre</th><th>Tipo de almacenamiento</th><th>Titular</th><th>Finalidad</th><th>Duración</th></tr>
+<tr><td>ca_ck</td><td>localStorage (no es una cookie de servidor)</td><td>Candy Ads (propia)</td><td>Recuerda si ya has elegido tu preferencia sobre el banner de cookies, para no volver a mostrarlo</td><td>Hasta que borres los datos de este sitio en tu navegador, o pulses «Restablecer preferencias» más abajo</td></tr>
 </table>
-<p>Este sitio web <strong>no utiliza cookies analíticas</strong> (Google Analytics u otras) <strong>ni cookies de publicidad</strong>. Si en el futuro se incorporan, esta Política se actualizará y se solicitará el consentimiento correspondiente.</p>
+<p>Este sitio web <strong>no utiliza cookies analíticas</strong> (Google Analytics u otras), <strong>ni cookies de publicidad</strong>, <strong>ni cookies o almacenamiento de terceros</strong>. Todas las fuentes tipográficas se sirven desde <strong>candyads.es</strong>; no se realiza ninguna petición a Google Fonts ni a ningún otro proveedor externo al cargar la página. Si en el futuro se incorpora algún elemento de terceros, esta Política se actualizará y se solicitará el consentimiento correspondiente.</p>
 
-<h2>3. Cookies de terceros complementarias</h2>
-<p>El sitio carga fuentes tipográficas de <strong>Google Fonts</strong> (fonts.googleapis.com). Google puede registrar información técnica básica de la solicitud. Consulta su política en <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>.</p>
+<h2>3. Cookies de terceros</h2>
+<p>Este sitio no usa cookies de terceros. El formulario de contacto de la landing y el formulario de leads de los anunciantes se envían directamente a nuestra propia infraestructura (AWS Lambda + Amazon SES, región de Irlanda), sin pasar por ningún proveedor externo que instale cookies en tu navegador.</p>
 
 <h2>4. Base jurídica</h2>
-<p>La cookie <em>ca_ck</em> se basa en el interés legítimo del responsable para recordar la preferencia de consentimiento (Art. 6.1.f RGPD). Las cookies técnicas de Formspree son necesarias para la prestación del servicio solicitado (Art. 6.1.b RGPD).</p>
+<p><em>ca_ck</em> es un dato de preferencia estrictamente técnico: solo sirve para no volver a mostrarte el banner una vez has elegido, y no se usa para ningún otro fin. Por eso se ampara en la <strong>excepción del artículo 22.2 de la LSSI-CE</strong> (dispositivos de almacenamiento estrictamente necesarios para prestar un servicio expresamente solicitado por el usuario: recordar su elección sobre el propio banner), y no requiere el consentimiento previo que sí exige el resto de cookies no técnicas. No se basa en el interés legítimo del art. 6.1.f RGPD.</p>
 
 <h2>5. Gestión del consentimiento</h2>
 <p>Al acceder al Sitio Web se muestra un banner que permite aceptar todas las cookies o seleccionar solo las necesarias. Puedes modificar tu preferencia en cualquier momento:</p>
@@ -64,19 +63,22 @@ a:hover{text-decoration:underline;}
   <button onclick="localStorage.removeItem('ca_ck');location.reload();" style="background:#7C3AED;color:#fff;border:none;padding:10px 20px;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Restablecer preferencias de cookies</button>
 </p>
 
-<h2>6. Cómo desactivar cookies desde el navegador</h2>
+<h2>6. Cómo borrar este dato desde el navegador</h2>
 <ul>
-<li><strong>Chrome:</strong> Configuración → Privacidad y seguridad → Cookies y otros datos de sitios</li>
-<li><strong>Firefox:</strong> Opciones → Privacidad y seguridad → Cookies y datos del sitio</li>
-<li><strong>Safari:</strong> Preferencias → Privacidad → Cookies y datos de sitios web</li>
-<li><strong>Edge:</strong> Configuración → Privacidad, búsqueda y servicios → Cookies</li>
+<li><strong>Chrome:</strong> Configuración → Privacidad y seguridad → Cookies y otros datos de sitios → Ver todos los datos y permisos de sitios</li>
+<li><strong>Firefox:</strong> Opciones → Privacidad y seguridad → Cookies y datos del sitio → Gestionar datos</li>
+<li><strong>Safari:</strong> Preferencias → Privacidad → Gestionar datos de sitios web</li>
+<li><strong>Edge:</strong> Configuración → Privacidad, búsqueda y servicios → Cookies y datos almacenados</li>
 </ul>
-<p style="margin-top:12px;">Deshabilitar las cookies técnicas puede afectar al correcto funcionamiento del formulario de contacto.</p>
+<p style="margin-top:12px;">Borrar este dato solo hace que el banner vuelva a aparecer en tu próxima visita; no afecta a ninguna otra funcionalidad del sitio.</p>
 
-<h2>7. Actualizaciones</h2>
+<h2>7. Tus derechos</h2>
+<p>Como <em>ca_ck</em> es un dato técnico que no identifica a una persona ni se usa para elaborar perfiles, no hay un tratamiento de datos personales asociado sobre el que ejercer derechos RGPD. Aun así, puedes en cualquier momento: pedirnos información sobre este dato, pedir que te expliquemos cómo funciona, y borrarlo tú mismo desde tu navegador (apartado 6) o desde el botón de esta página (apartado 5). Para cualquier otra cuestión relacionada con tus datos personales, consulta la <a href="politica-privacidad.html">Política de Privacidad</a> o escribe a <strong>equipo@candyads.es</strong>. También puedes reclamar ante la <strong>Agencia Española de Protección de Datos</strong> (aepd.es).</p>
+
+<h2>8. Actualizaciones</h2>
 <p>Esta Política puede actualizarse si se incorporan nuevas herramientas o cambia la normativa aplicable. La fecha de actualización que figura en la cabecera indica la versión vigente.</p>
 
-<h2>8. Contacto</h2>
+<h2>9. Contacto</h2>
 <p>Para cualquier duda: <a href="mailto:equipo@candyads.es">equipo@candyads.es</a> · 634 237 322</p>
 </div><footer class="legal-footer">
 <a href="index.html">Candy Ads</a> &nbsp;·&nbsp;

@@ -34,13 +34,14 @@ Landing page de Candy Ads: venta de espacios publicitarios en sobres de azúcar 
 
 - Formulario de contacto → Formspree (`https://formspree.io/f/xojoqook`)
 - Enlace directo de WhatsApp (`wa.me/34634237322`)
-- Google Fonts (Inter, Playfair Display)
+- Inter y Playfair Display: autoalojadas en `docs/assets/fonts/` (solo variantes `latin`/`latin-ext`, sin cirílico/griego/vietnamita) + `docs/assets/fonts.css`. NO volver a apuntar a `fonts.googleapis.com`: era la única llamada a un tercero del sitio y ya no existe. Si se necesita otro peso o familia, descargar el `.woff2` con el mismo procedimiento (CSS de Google con user-agent moderno, filtrar `latin`/`latin-ext`) en vez de enlazar Google Fonts.
 - Sin analítica instalada actualmente
 
 ## Pendiente conocido
 
 - Correo de equipo@candyads.es: recibe con Zoho Mail EU (MX mx/mx2/mx3.zoho.eu, SPF `include:zohomail.eu`). Falta comprobar/activar el DKIM de Zoho. Los leads salen por SES con sus propios DKIM (no tocar esos CNAME `*._domainkey`).
 - SES: solicitud de acceso a producción enviada el 2026-09-21 (sigue en revisión hasta que AWS conteste, hasta 24 h). Hasta entonces solo envía a direcciones verificadas.
+- Revisión legal externa (RGPD/LSSI/mercantil) del sistema de leads, 2026-09-22, en curso por fases (ver más abajo). Fase 1 (política de privacidad, SES, fuentes, base legal del banner) hecha. Fase 2 (identificación del anunciante en el formulario, checkbox de consentimiento, línea de menores), Fase 3 (sustituir Formspree) y Fase 4 (documentos legales fuera del repo) pendientes o en curso — ver detalle en la sección de leads.
 
 ## Sistema de leads para anunciantes
 
@@ -63,6 +64,16 @@ Añadir un anunciante: 1) `docs/data/anunciantes/<slug>.json` (nombre, activo, t
 Estado: Fases 1, 2a y 2b hechas y probadas en producción. El destino de `lacasa-piloto` es un email de PRUEBAS; cambiarlo al de José al salir a producción. SES: salida del modo pruebas solicitada el 2026-09-21 (caso AWS 179002340300449); AWS pidió más detalle y se respondió ese mismo día, pendiente de su decisión (hoy solo envía a direcciones verificadas). Pendiente: pasar Supabase a Pro, panel interno con Supabase Auth (2c, parte 2; el generador de QR ya está hecho), datos legales de La Casa (razón social, CIF, email de privacidad → campo `responsable` del JSON) y revisión de un abogado. La política de privacidad ya incluye la sección 8 (leads, encargado del tratamiento), publicada el 2026-09-21; el borrador de consulta jurídica vive fuera del repo (público), en `Desktop\candyads-abogado`.
 
 Panel del equipo: `docs/panel.html` (noindex, CSP `script-src 'self'`, sin terceros). Un solo login (Supabase Auth, email+contraseña; solo emails de `panel_admins`, comprobado con la RPC `es_admin`) y barra de herramientas. `assets/panel/core.js` = login, permisos y navegación; cada herramienta es un archivo aparte que se registra con `PanelCore.registrar({id, titulo, montar(cont, ctx)})`: `trazabilidad.js` (contadores por anunciante y vista por días con hora, referencia y estado; avisa en rojo de `pendiente`/`error`) y `qr.js` (generador de QR con `qrcode-lib.js`, MIT, alojada aquí). **Añadir una herramienta (p. ej. un CRM):** crear `assets/panel/<nombre>.js`, cargarlo en `panel.html` tras `core.js` (el orden de las líneas = orden de pestañas) y sus tablas en Supabase con RLS cerrada y política `using (public.es_admin())`. Hoy todos los admins ven todo; si hace falta separar permisos por herramienta, añadir una columna de roles a `panel_admins` y filtrar en `core.js`. URL y publishable key son públicas; la secret key nunca. `tools/qr.html` sigue existiendo como versión local sin conexión, pero el generador de uso normal es el del panel.
+
+## Revisión legal 2026-09-22 (RGPD/LSSI/mercantil, por fases)
+
+Fase 1 (hecha, publicada): política de privacidad reescrita — Candy Ads es responsable de sus tratamientos propios y, para el sistema de leads QR, **corresponsable con el anunciante en la fase de recogida** (art. 26 RGPD: diseño del formulario y consentimiento) y **encargado en la fase de transmisión** (art. 28 RGPD: envío del correo y trazabilidad); lista real de subencargados (AWS Lambda+SES Irlanda, Supabase Fráncfort, Zoho Mail UE) con su garantía de transferencia correcta (AWS: Data Privacy Framework: Supabase: Cláusulas Contractuales Tipo — **no** son lo mismo, no simplificar). Fuentes autoalojadas (ver arriba). Política de cookies corregida: `ca_ck` no es una cookie de servidor sino `localStorage` (index.html), amparada en la excepción del art. 22.2 LSSI (dato técnico necesario para el propio banner), no en el interés legítimo 6.1.f; se añadieron los derechos del interesado que faltaban. SES: `candyads.es` tenía "Reenvío de retroalimentación por correo electrónico" **habilitado** y ningún tema de SNS para rebotes/quejas — si un envío a un anunciante rebotaba, SES podía reenviar una copia del mensaje original (con el `Reply-To` y los datos del lead) por un canal fuera de la trazabilidad. Se desactivó el reenvío y se creó el tema SNS `candyads-ses-eventos` (arn:aws:sns:eu-west-1:033177020665:candyads-ses-eventos) con Bounce y Complaint apuntando a él **sin** "incluir encabezados originales", suscrito por email a equipo@candyads.es (pendiente de confirmar el enlace que manda SNS). Auditados los logs de la Lambda (`log.info`/`log.error` en `core.mjs`): nunca imprimen `datos`, solo `slug`/`status`/`code`/nombre de error — ya estaban limpios.
+
+Fase 2 (formulario `/lead/<slug>`): pendiente identificar al anunciante con `razon_social`, `nif_cif`, `email_privacidad` en `docs/data/anunciantes/<slug>.json` — **`lacasa-piloto` no debe recibir tráfico real del QR hasta tener esos tres datos reales de La Casa Agency**; no rellenar con placeholders. Checkbox de consentimiento desmarcada por defecto con redacción específica por finalidad, y línea de menores de 14 años: pendientes de implementar en `assets/lead.js`.
+
+Fase 3 (pendiente): sustituir Formspree (formulario de contacto de la landing, EE. UU.) por la misma arquitectura Lambda+SES que los leads, para no depender de un proveedor adicional; al terminar, quitar la mención a Formspree de privacidad y cookies.
+
+Fase 4 (pendiente): contrato de encargo/corresponsabilidad para firmar con cada anunciante (Parte I art. 26, Parte II art. 28) y demás documentos legales — fuera de `docs/` (repo público), en una carpeta no publicada o fuera del repo.
 
 ## Convenciones
 
