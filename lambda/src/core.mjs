@@ -1,5 +1,6 @@
 import { validarDatos } from './campos.mjs';
 import { construirCorreo } from './email.mjs';
+import { validarContacto, construirCorreoContacto } from './contacto.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
@@ -13,6 +14,7 @@ const CFG_TTL_NEG = 60 * 1000;
 const RETO_TTL_S = 10 * 60;
 const RETO_COST = 1000;
 const ENV_OBLIGATORIAS = ['ALLOWED_ORIGIN', 'SITE_URL', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'ALTCHA_HMAC_SECRET', 'ALTCHA_HMAC_KEY_SECRET', 'SES_FROM'];
+const ENV_OBLIGATORIAS_CONTACTO = ['ALLOWED_ORIGIN', 'SES_FROM', 'CONTACT_TO'];
 
 // req: { method, path, headers (en minúsculas), body (string), ip }
 // deps: { env, fetchImpl, sendEmail, altcha, now, log }
@@ -206,6 +208,39 @@ export function createHandler(deps) {
     return fin(200, 'ok');
   }
 
+  // Formulario de contacto de la landing (sustituye a Formspree). No guarda nada: solo envía un correo
+  // a equipo@candyads.es con "Responder a" = quien escribe.
+  async function contactar(req, cors) {
+    const fin = (status, code) => {
+      log.info(JSON.stringify({ evt: 'contacto', status, code }));
+      return json(status, status === 200 ? { ok: true } : { ok: false, code }, cors);
+    };
+
+    if (req.body.length > MAX_BODY) return fin(413, 'demasiado_grande');
+    let b;
+    try { b = JSON.parse(req.body); } catch { return fin(400, 'json'); }
+    if (!b || typeof b !== 'object') return fin(400, 'json');
+
+    if (excedeLimite(req.ip || 'desconocida')) return fin(429, 'limite_ip');
+
+    // Campo trampa: si un robot lo rellena, respondemos como si hubiera ido bien pero no enviamos nada.
+    if (b.web_site) return fin(200, 'ok');
+    if (typeof b.t !== 'number' || b.t < MIN_MS) return fin(400, 'demasiado_rapido');
+    if (b.privacidad !== true) return fin(400, 'privacidad');
+
+    const v = validarContacto(b.datos);
+    if (!v.ok) return fin(400, 'datos_' + v.motivo.replace(/\s+/g, '_'));
+
+    try {
+      const correo = construirCorreoContacto({ datos: v.datos, ahora: now() });
+      await sendEmail({ from: env.SES_FROM, to: env.CONTACT_TO, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });
+    } catch (e) {
+      log.error(JSON.stringify({ evt: 'contacto_envio_fallido', error: (e && e.name) || 'error' }));
+      return fin(502, 'envio');
+    }
+    return fin(200, 'ok');
+  }
+
   return async function handle(req) {
     const origin = req.headers.origin || '';
     const permitido = origin === env.ALLOWED_ORIGIN;
@@ -221,6 +256,11 @@ export function createHandler(deps) {
       log.error(JSON.stringify({ evt: 'config_incompleta', faltan }));
       return json(500, { ok: false, code: 'config' }, cors);
     }
+    const faltanContacto = ENV_OBLIGATORIAS_CONTACTO.filter((k) => !env[k]);
+    if (faltanContacto.length && req.path.endsWith('/contacto')) {
+      log.error(JSON.stringify({ evt: 'config_incompleta', faltan: faltanContacto }));
+      return json(500, { ok: false, code: 'config' }, cors);
+    }
 
     if (req.method === 'GET' && req.path.endsWith('/challenge')) {
       try { return json(200, await crearReto(), cors); }
@@ -228,6 +268,7 @@ export function createHandler(deps) {
     }
     if (req.method === 'POST' && req.path.endsWith('/lead')) return lead(req, cors);
     if (req.method === 'POST' && req.path.endsWith('/confirmar')) return confirmar(req, cors);
+    if (req.method === 'POST' && req.path.endsWith('/contacto')) return contactar(req, cors);
     return json(404, { ok: false, code: 'ruta' }, cors);
   };
 }

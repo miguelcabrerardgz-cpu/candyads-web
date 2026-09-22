@@ -47,7 +47,7 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
     env: {
       ALLOWED_ORIGIN: ORIGIN, SITE_URL: ORIGIN, SUPABASE_URL: 'https://x.supabase.co',
       SUPABASE_SECRET_KEY: 'sb_secret_test', ALTCHA_HMAC_SECRET: 'secreto-a', ALTCHA_HMAC_KEY_SECRET: 'secreto-b',
-      SES_FROM: 'Candy Ads <leads@candyads.es>', ALTCHA_COST: '50'
+      SES_FROM: 'Candy Ads <leads@candyads.es>', ALTCHA_COST: '50', CONTACT_TO: 'equipo@candyads.es'
     },
     fetchImpl,
     altcha: { createChallenge, verifySolution, randomInt, deriveKey },
@@ -80,6 +80,12 @@ async function enviar(handle, over = {}, ip = '2.2.2.2') {
 const codigo = (r) => JSON.parse(r.body).code;
 const confirmar = (handle, body, ip = '20.20.20.1', headers = cab) =>
   handle({ method: 'POST', path: '/confirmar', headers, body: JSON.stringify(body), ip });
+
+const datosContactoOk = () => ({ nombre: 'Marta Prueba', empresa: 'Bar Ejemplo', tipo: 'bar', telefono: '600123456', email: 'marta.prueba@example.com', mensaje: 'Mensaje privado 123' });
+async function contactar(handle, over = {}, ip = '30.30.30.1') {
+  const cuerpo = { datos: datosContactoOk(), privacidad: true, t: 5000, ...over };
+  return handle({ method: 'POST', path: '/contacto', headers: cab, body: JSON.stringify(cuerpo), ip });
+}
 
 test('reto ALTCHA: firmado y con caducidad', async () => {
   const { handle } = entorno();
@@ -305,4 +311,55 @@ test('sin configuración completa el backend falla cerrado (no emite retos ni ac
   assert.equal(r3.statusCode, 500);
   assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'));
   assert.ok(!estado.logs.join('').includes('sb_secret'));
+});
+
+test('contacto: camino feliz, un email a CONTACT_TO con "Responder a" el remitente, sin datos personales en logs', async () => {
+  const { handle, estado } = entorno();
+  const r = await contactar(handle);
+  assert.equal(r.statusCode, 200);
+  assert.equal(estado.correos.length, 1);
+  const c = estado.correos[0];
+  assert.equal(c.to, 'equipo@candyads.es');
+  assert.equal(c.replyTo, 'marta.prueba@example.com');
+  assert.ok(c.text.includes('Marta Prueba'));
+  assert.ok(!c.subject.includes('Marta Prueba'), 'el asunto no debe llevar datos personales');
+  const logs = estado.logs.join('\n');
+  for (const p of ['Marta Prueba', '600123456', 'marta.prueba@example.com', 'Mensaje privado 123']) {
+    assert.ok(!logs.includes(p), 'log con dato personal: ' + p);
+  }
+});
+
+test('contacto: validaciones básicas', async () => {
+  const { handle, estado } = entorno();
+  assert.equal(codigo(await contactar(handle, { privacidad: false }, '31.1.1.1')), 'privacidad');
+  assert.equal(codigo(await contactar(handle, { t: 500 }, '31.1.1.2')), 'demasiado_rapido');
+  assert.equal(codigo(await contactar(handle, { datos: { ...datosContactoOk(), email: 'no-es-un-email' } }, '31.1.1.3')), 'datos_formato');
+  assert.equal(codigo(await contactar(handle, { datos: { ...datosContactoOk(), nombre: '' } }, '31.1.1.4')), 'datos_obligatorio');
+  assert.equal(codigo(await contactar(handle, { datos: { ...datosContactoOk(), tipo: 'otra-cosa' } }, '31.1.1.5')), 'datos_opción_no_válida');
+  assert.equal(codigo(await contactar(handle, { datos: { ...datosContactoOk(), extra: 'x' } }, '31.1.1.6')), 'datos_campo_no_permitido');
+  assert.equal(estado.correos.length, 0);
+});
+
+test('contacto: campo trampa devuelve 200 sin enviar nada', async () => {
+  const { handle, estado } = entorno();
+  const r = await contactar(handle, { web_site: 'http://spam.example' }, '31.2.1.1');
+  assert.equal(r.statusCode, 200);
+  assert.equal(estado.correos.length, 0);
+});
+
+test('contacto: origen no permitido da 403; falta CONTACT_TO falla cerrado', async () => {
+  const { handle } = entorno();
+  const r = await handle({ method: 'POST', path: '/contacto', headers: { origin: 'https://malo.example' }, body: '{}', ip: '31.3.1.1' });
+  assert.equal(r.statusCode, 403);
+
+  const estado2 = { logs: [] };
+  const handleSinContacto = createHandler({
+    env: { ALLOWED_ORIGIN: ORIGIN, SES_FROM: 'a@b.es' },
+    altcha: { createChallenge, verifySolution, randomInt, deriveKey },
+    sendEmail: async () => { throw new Error('no debería enviar'); },
+    log: { info: (m) => estado2.logs.push(m), error: (m) => estado2.logs.push(m) }
+  });
+  const r2 = await handleSinContacto({ method: 'POST', path: '/contacto', headers: cab, body: '{}', ip: '31.3.1.2' });
+  assert.equal(r2.statusCode, 500);
+  assert.equal(JSON.parse(r2.body).code, 'config');
 });

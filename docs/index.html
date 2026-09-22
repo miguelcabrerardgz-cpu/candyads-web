@@ -973,9 +973,8 @@ img{max-width:100%;}
       </div>
 
       <div>
-        <form id="contact-form" action="https://formspree.io/f/xojoqook" method="POST">
-          <input type="hidden" name="_subject" value="Nuevo lead — Candy Ads">
-          <input type="hidden" name="_next" value="https://candyads.es?ok=1">
+        <form id="contact-form">
+          <input type="text" name="web_site" tabindex="-1" autocomplete="off" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
 
           <div class="form-grid">
             <div class="form-group">
@@ -1185,7 +1184,7 @@ img{max-width:100%;}
 <!-- COOKIE BANNER -->
 <div id="cookie-banner">
   <div class="cookie-inner">
-    <p class="cookie-text">Usamos cookies técnicas propias y de Formspree (gestión del formulario de contacto). <a href="politica-cookies.html">Más información</a>.</p>
+    <p class="cookie-text">Usamos únicamente un dato técnico propio para recordar tu preferencia sobre este aviso. <a href="politica-cookies.html">Más información</a>.</p>
     <div class="cookie-actions">
       <button class="cookie-btn cookie-reject" onclick="setCookie('rejected')">Solo necesarias</button>
       <button class="cookie-btn cookie-accept" onclick="setCookie('accepted')">Aceptar</button>
@@ -1200,27 +1199,46 @@ function setCookie(v){ localStorage.setItem('ca_ck',v); document.getElementById(
 
 // ── AJAX form — no page redirect, inline success ───────────────────────────
 (function(){
+  // Backend propio (misma Lambda + SES que el formulario de leads), no Formspree: sin depender de un
+  // proveedor adicional. En localhost usa el backend de pruebas del mismo origen.
+  var ENDPOINT_CONTACTO = location.hostname === 'localhost' ? '/api' : 'https://rx4ydbbhvlm4zuyo3p5ci3an3q0filte.lambda-url.eu-west-1.on.aws';
+  var t0 = Date.now();
   const form = document.getElementById('contact-form');
   const ok   = document.getElementById('form-ok');
   const btn  = form ? form.querySelector('.btn-submit') : null;
   if(!form) return;
   form.addEventListener('submit', async function(e){
     e.preventDefault();
+    if (form.elements.web_site.value) { form.style.display='none'; ok.style.display='block'; return; }
     btn.textContent = 'Enviando...';
     btn.disabled = true;
     btn.style.opacity = '.6';
+    const datos = {
+      nombre: form.elements.nombre.value.trim(),
+      empresa: form.elements.empresa.value.trim(),
+      tipo: form.elements.tipo.value,
+      telefono: form.elements.telefono.value.trim(),
+      email: form.elements.email.value.trim(),
+      mensaje: form.elements.mensaje.value.trim()
+    };
     try{
-      const res = await fetch('https://formspree.io/f/xojoqook', {
-        method:'POST',
-        body: new FormData(form),
-        headers:{ 'Accept':'application/json' }
+      const res = await fetch(ENDPOINT_CONTACTO + '/contacto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ datos: datos, privacidad: form.elements.privacidad.checked, t: Date.now() - t0 }),
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer'
       });
       if(res.ok){
         form.style.display='none';
         ok.style.display='block';
       } else {
-        const data = await res.json();
-        const msg = data.errors ? data.errors.map(e=>e.message).join(', ') : 'Error al enviar. Inténtalo de nuevo.';
+        const data = await res.json().catch(function(){ return {}; });
+        const code = (data && data.code) || '';
+        let msg = 'No hemos podido enviar tu mensaje. Inténtalo de nuevo en unos minutos.';
+        if (code === 'privacidad') msg = 'Tienes que aceptar la política de privacidad para enviar el mensaje.';
+        else if (code.indexOf('datos_') === 0) msg = 'Revisa los datos del formulario e inténtalo de nuevo.';
+        else if (res.status === 429) msg = 'Has enviado demasiados mensajes. Inténtalo de nuevo en unos minutos.';
         alert(msg);
         btn.textContent = 'Enviar mensaje';
         btn.disabled = false;
