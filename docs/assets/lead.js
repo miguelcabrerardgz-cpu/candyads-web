@@ -159,6 +159,13 @@
   function renderForm(app, slug, cfg) {
     var nombre = cfg.nombre_mostrado;
     var responsable = typeof cfg.responsable === 'string' && cfg.responsable ? cfg.responsable : nombre;
+    // Identificación formal del anunciante (razón social + NIF), cuando el anunciante ya la tiene
+    // configurada. Si falta cualquiera de los tres datos, se usa el nombre comercial como hasta ahora:
+    // nunca se inventa ni se deja un hueco con un placeholder.
+    var idCompleta = typeof cfg.razon_social === 'string' && cfg.razon_social
+      && typeof cfg.nif_cif === 'string' && cfg.nif_cif
+      && typeof cfg.email_privacidad === 'string' && cfg.email_privacidad;
+    var razonSocial = idCompleta ? cfg.razon_social : responsable;
     var t0 = Date.now();
 
     document.title = 'Contacta con ' + nombre;
@@ -201,25 +208,34 @@
       });
     }
 
+    // Casilla desmarcada por defecto (el elemento no lleva "checked"), con redacción específica de la
+    // finalidad concreta: a quién van los datos y para qué, no un genérico "acepto la política de privacidad".
     var cf = el('div', { 'class': 'field consent-field' });
     var consent = el('div', { 'class': 'consent' });
     consent.appendChild(el('input', { type: 'checkbox', id: 'f-consent', name: 'consent', 'aria-describedby': 'err-consent' }));
     consent.appendChild(el('label', { 'for': 'f-consent' },
-      'He leído la información sobre protección de datos y acepto que mis datos se envíen a ' + nombre + ' para que me contacte.'));
+      'Consiento que mis datos sean enviados a ' + razonSocial + ' para que me contacte en relación con mi solicitud.'));
     cf.appendChild(consent);
     cf.appendChild(el('p', { 'class': 'msg-err', id: 'err-consent' }, 'Necesitas aceptar para poder enviar tu solicitud.'));
     form.appendChild(cf);
+    form.appendChild(el('p', { 'class': 'privacy-note' }, 'Si tienes menos de 14 años, pide a un adulto que rellene este formulario por ti.'));
 
     var det = el('details', { 'class': 'rgpd' });
     det.appendChild(el('summary', null, 'Información básica sobre protección de datos'));
     var ul = el('ul');
-    [
+    (idCompleta ? [
+      'Responsable: ' + cfg.razon_social + ', NIF ' + cfg.nif_cif + ', ' + cfg.email_privacidad + '.',
+      'Finalidad: gestionar tu solicitud de contacto.',
+      'Base jurídica: tu consentimiento.',
+      'Candy Ads (Miguel Cabrera Rodríguez, NIF 29541337E) transmite tu solicitud por cuenta del responsable y no la conserva.',
+      'Derechos: acceso, rectificación, supresión, oposición, limitación y portabilidad, ante ' + cfg.razon_social + ' en ' + cfg.email_privacidad + ', o ante Candy Ads en equipo@candyads.es, que la trasladará.'
+    ] : [
       'Responsable: ' + responsable + '.',
       'Finalidad: atender tu solicitud de contacto.',
       'Legitimación: tu consentimiento.',
       'Destinatario: tus datos se envían directamente a ' + nombre + '. Candy Ads solo transmite tu mensaje y no conserva tus datos personales; únicamente registra un contador anónimo de solicitudes.',
       'Derechos: acceso, rectificación, supresión, oposición, limitación y portabilidad, dirigiéndote a ' + responsable + '.'
-    ].forEach(function (t) { ul.appendChild(el('li', null, t)); });
+    ]).forEach(function (t) { ul.appendChild(el('li', null, t)); });
     det.appendChild(ul);
     var more = el('p');
     more.appendChild(document.createTextNode('Más información en la '));
