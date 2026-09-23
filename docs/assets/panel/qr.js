@@ -30,7 +30,7 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
 
-  function montar(cont, ctx) {
+  function montar(cont, ctx, slugInicial) {
     var el = ctx.el;
     var actual = null;
 
@@ -41,7 +41,7 @@
     f1.appendChild(el('label', 'lbl', 'Identificador del anunciante'));
     var fila = el('div', 'qr-fila');
     fila.appendChild(el('span', null, BASE));
-    var slug = el('input'); slug.type = 'text'; slug.value = 'lacasa-piloto'; slug.autocomplete = 'off'; slug.spellcheck = false;
+    var slug = el('input'); slug.type = 'text'; slug.value = slugInicial || ''; slug.autocomplete = 'off'; slug.spellcheck = false;
     fila.appendChild(slug);
     f1.appendChild(fila);
     var err = el('div', 'qr-err');
@@ -61,7 +61,7 @@
     var bPng = el('button', 'btn sec', 'Descargar PNG'); bPng.type = 'button';
     botones.append(bSvg, bPng);
     var nota = el('p', 'p-note', 'Antes de imprimir: escanea el QR con un móvil y comprueba que abre el formulario del anunciante correcto. ' +
-      'El anunciante debe existir en docs/data/anunciantes/<identificador>.json y tener su email de destino en Supabase. ' +
+      'La campaña debe existir en la pestaña "Campañas" (así se crea también su fila en Supabase). ' +
       'Deja margen blanco alrededor al imprimir y un tamaño mínimo de 2 cm de lado.');
     cont.append(f1, f2, vista, urlTxt, botones, nota);
 

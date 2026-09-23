@@ -41,3 +41,19 @@ h1.p-h1{font-size:24px;margin:0 0 14px;}
 .qr-botones .btn{flex:1;min-width:200px;}
 button.btn.sec{background:#fff;color:var(--adv);border:1px solid var(--adv);box-shadow:none;}
 button.btn.sec:hover{background:rgba(var(--adv-rgb),.06);}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:.2px;}
+.badge-activa{background:rgba(4,120,87,.12);color:var(--ok);}
+.badge-pausada{background:#FFFBEB;color:#B45309;}
+.badge-finalizada{background:rgba(107,107,128,.14);color:var(--muted);}
+label.check{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--ink);margin-bottom:8px;cursor:pointer;}
+label.check input{width:18px;height:18px;accent-color:var(--adv);flex-shrink:0;}
+input[type=number]{
+  width:100%;font:inherit;font-size:16px;color:var(--ink);background:#fff;
+  border:1px solid #CBD0E2;border-radius:11px;padding:12px 14px;appearance:none;-webkit-appearance:none;
+}
+input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3px rgba(var(--adv-rgb),.18);}
+.p-confirmacion{text-align:center;padding:12px 0 4px;}
+.p-confirmacion .btn{margin:6px;}
+.p-bloque{border-top:1px solid var(--border);margin-top:26px;padding-top:22px;}
+.archivo-fila{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
+.archivo-fila span{flex:1;font-size:14px;color:var(--ink);word-break:break-all;}

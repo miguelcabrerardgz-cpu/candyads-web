@@ -24,7 +24,8 @@
   function api(path, opts) {
     opts = opts || {};
     var h = { apikey: PUBLISHABLE_KEY };
-    if (opts.body) h['Content-Type'] = 'application/json';
+    // contentType permite subir archivos (Supabase Storage) sin forzar application/json.
+    if (opts.body != null) h['Content-Type'] = opts.contentType || 'application/json';
     if (token) h.Authorization = 'Bearer ' + token;
     return fetch(SUPABASE_URL + path, { method: opts.method || 'GET', headers: h, body: opts.body, cache: 'no-store' });
   }
@@ -110,18 +111,20 @@
     barra.appendChild(out);
     app.append(barra, cont);
 
-    function abrir(id) {
+    function abrir(id, param) {
       var h = herramientas.filter(function (x) { return x.id === id; })[0] || herramientas[0];
       if (!h) return;
       Object.keys(botones).forEach(function (k) { botones[k].classList.toggle('activa', k === h.id); });
       try { history.replaceState(null, '', '#' + h.id); } catch (e) { /* sin historial: da igual */ }
       clear(cont);
-      h.montar(cont, ctx);
+      h.montar(cont, ctx, param);
     }
+    ctx.irA = abrir;
     abrir((location.hash || '').slice(1));
   }
 
-  var ctx = { el: el, clear: clear, api: api, ymd: ymd, tabla: tabla, sesionCaducada: sesionCaducada };
+  // ctx.irA se asigna en shell() (necesita el "abrir" de la sesión actual); antes del login es un no-op.
+  var ctx = { el: el, clear: clear, api: api, ymd: ymd, tabla: tabla, sesionCaducada: sesionCaducada, irA: function () {} };
 
   window.PanelCore = {
     registrar: function (h) { herramientas.push(h); },

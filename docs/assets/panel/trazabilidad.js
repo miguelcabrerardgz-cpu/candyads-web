@@ -1,5 +1,8 @@
 // Herramienta: trazabilidad de leads (solo lectura). Muestra contadores y, por día, cada lead con su hora
 // exacta, referencia y estado. No existe ningún dato personal de leads en la base de datos.
+//
+// Sin registrar en panel.html desde la Fase 2 de "Campañas" (sustituida por esa pestaña). Se conserva
+// como referencia: la Fase 3.3 reutilizará esta lógica, filtrada por campaña, dentro de su ficha.
 (function () {
   'use strict';
 
