@@ -54,7 +54,7 @@ Una vez el Interesado envía el formulario, Candy Ads, como encargado del tratam
 
 ### 7. Instrucciones documentadas
 
-Candy Ads tratará los datos personales únicamente siguiendo las instrucciones documentadas de El Anunciante, que quedan recogidas en el presente contrato y en la configuración técnica del formulario (`docs/data/anunciantes/<identificador>.json` y el email de destino registrado). Cualquier instrucción adicional deberá constar por escrito (incluido correo electrónico).
+Candy Ads tratará los datos personales únicamente siguiendo las instrucciones documentadas de El Anunciante, que quedan recogidas en el presente contrato y en la configuración técnica del formulario (ficha de la campaña en el panel interno de Candy Ads, con su email de destino registrado en Supabase). Cualquier instrucción adicional deberá constar por escrito (incluido correo electrónico).
 
 ### 8. Tipo de datos e Interesados
 
