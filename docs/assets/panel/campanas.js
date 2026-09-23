@@ -321,7 +321,57 @@
     var TIPOS_LOGO = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
     var MAX_LOGO = 2 * 1024 * 1024;
 
-    function bloqueLogo(a) {
+    // Color dominante del logo, calculado en un <canvas> en el propio navegador (nada se envía a
+    // ningún sitio para esto). Ignora casi-blanco (fondo habitual de un logo) y casi-negro (texto/
+    // contorno, poco representativo como "color de marca"); agrupa tonos parecidos para no acabar
+    // con dos colores casi iguales como principal/secundario.
+    function detectarColores(file) {
+      return new Promise(function (resolve) {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        function limpiar() { URL.revokeObjectURL(url); }
+        img.onload = function () {
+          try {
+            var tam = 80;
+            var cv = document.createElement('canvas'); cv.width = tam; cv.height = tam;
+            var cx = cv.getContext('2d');
+            cx.drawImage(img, 0, 0, tam, tam);
+            var datos = cx.getImageData(0, 0, tam, tam).data;
+            var cuentas = {};
+            for (var i = 0; i < datos.length; i += 4) {
+              var r = datos[i], g = datos[i + 1], b = datos[i + 2], al = datos[i + 3];
+              if (al < 128) continue;
+              if (r > 235 && g > 235 && b > 235) continue;
+              if (r < 20 && g < 20 && b < 20) continue;
+              var rq = Math.round(r / 24) * 24, gq = Math.round(g / 24) * 24, bq = Math.round(b / 24) * 24;
+              var clave = rq + ',' + gq + ',' + bq;
+              cuentas[clave] = (cuentas[clave] || 0) + 1;
+            }
+            var lista = Object.keys(cuentas).map(function (k) {
+              var p = k.split(',').map(Number);
+              return { r: p[0], g: p[1], b: p[2], n: cuentas[k] };
+            }).sort(function (x, y) { return y.n - x.n; });
+            function hex(c) {
+              function h2(v) { return Math.min(255, Math.max(0, v)).toString(16).padStart(2, '0'); }
+              return '#' + h2(c.r) + h2(c.g) + h2(c.b);
+            }
+            function distancia(x, y) { return Math.abs(x.r - y.r) + Math.abs(x.g - y.g) + Math.abs(x.b - y.b); }
+            var principal = lista[0];
+            if (!principal) { limpiar(); resolve(null); return; }
+            var secundario = null;
+            for (var j = 1; j < lista.length; j++) {
+              if (distancia(lista[j], principal) > 90) { secundario = lista[j]; break; }
+            }
+            limpiar();
+            resolve({ color: hex(principal), colorSecundario: secundario ? hex(secundario) : null });
+          } catch (e) { limpiar(); resolve(null); }
+        };
+        img.onerror = function () { limpiar(); resolve(null); };
+        img.src = url;
+      });
+    }
+
+    function bloqueLogo(a, iColor, iColorSec) {
       var wrap = el('div', 'field logo-campo');
       wrap.appendChild(el('label', 'lbl', 'Logo'));
       var preview = el('div', 'logo-preview');
@@ -338,11 +388,13 @@
       pintarPreview();
 
       var errLogo = el('div', 'p-err'); errLogo.style.display = 'none';
+      var notaColores = el('p', 'p-note'); notaColores.style.display = 'none';
       var inputLogo = el('input'); inputLogo.type = 'file'; inputLogo.accept = '.png,.jpg,.jpeg,.webp,.svg';
       var subirLogo = el('button', 'btn sec', 'Subir logo'); subirLogo.type = 'button';
 
       subirLogo.addEventListener('click', function () {
         errLogo.style.display = 'none';
+        notaColores.style.display = 'none';
         var file = inputLogo.files && inputLogo.files[0];
         if (!file) { errLogo.textContent = 'Elige una imagen primero.'; errLogo.style.display = 'block'; return; }
         if (file.size > MAX_LOGO) { errLogo.textContent = 'La imagen pesa más de 2 MB.'; errLogo.style.display = 'block'; return; }
@@ -369,12 +421,19 @@
             a.tema_logo = url;
             pintarPreview();
             inputLogo.value = '';
+            return detectarColores(file);
           });
+        }).then(function (colores) {
+          if (!colores || !iColor) return;
+          iColor.value = colores.color;
+          if (colores.colorSecundario && iColorSec) iColorSec.value = colores.colorSecundario;
+          notaColores.textContent = 'Colores detectados del logo: revísalos abajo y pulsa «Guardar ficha» para aplicarlos.';
+          notaColores.style.display = 'block';
         }).catch(function (e) { errLogo.textContent = e.message; errLogo.style.display = 'block'; })
           .then(function () { subirLogo.disabled = false; });
       });
 
-      wrap.append(preview, errLogo, inputLogo, subirLogo);
+      wrap.append(preview, errLogo, inputLogo, subirLogo, notaColores);
       return wrap;
     }
 
@@ -383,7 +442,6 @@
     function bloqueFicha(a) {
       var sec = el('section', 'p-bloque');
       sec.appendChild(el('h2', 'p', 'Ficha'));
-      sec.appendChild(bloqueLogo(a));
       var form = el('form');
       var err = el('div', 'p-err'); err.style.display = 'none';
 
@@ -400,6 +458,10 @@
       var zona = campoTexto('Zona', 'text'); zona.input.value = a.zona || '';
       var color = campoTexto('Color principal del tema (hex)', 'text'); color.input.value = a.tema_color || ''; color.input.placeholder = '#1C4C98';
       var colorSec = campoTexto('Color secundario del tema (hex)', 'text'); colorSec.input.value = a.tema_color_secundario || '';
+
+      // El logo se sube aparte (bloqueLogo), pero al detectar sus colores rellena estos mismos campos
+      // para revisarlos antes de guardar la ficha.
+      sec.appendChild(bloqueLogo(a, color.input, colorSec.input));
 
       var fCampos = el('div', 'field');
       fCampos.appendChild(el('label', 'lbl', 'Campos del formulario público'));
