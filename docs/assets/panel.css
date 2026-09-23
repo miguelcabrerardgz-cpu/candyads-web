@@ -61,3 +61,6 @@ input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3
 .logo-campo input[type=file]{display:block;margin-bottom:10px;font-size:13px;}
 .archivo-fila{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
 .archivo-fila span{flex:1;font-size:14px;color:var(--ink);word-break:break-all;}
+.p-peligro{border-color:rgba(185,28,28,.25);}
+button.btn.peligro{background:#fff;color:var(--err);border:1px solid var(--err);box-shadow:none;}
+button.btn.peligro:hover{background:var(--err-bg);}
