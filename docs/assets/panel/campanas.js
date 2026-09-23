@@ -316,11 +316,74 @@
       return sec;
     }
 
+    // Logo de la campaña: se sube directo al bucket público anunciantes-logos (Supabase Storage) y
+    // /lead/<slug> lo carga desde ahí al instante — no hace falta commitear ningún archivo al repo.
+    var TIPOS_LOGO = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+    var MAX_LOGO = 2 * 1024 * 1024;
+
+    function bloqueLogo(a) {
+      var wrap = el('div', 'field logo-campo');
+      wrap.appendChild(el('label', 'lbl', 'Logo'));
+      var preview = el('div', 'logo-preview');
+      function pintarPreview() {
+        ctx.clear(preview);
+        if (a.tema_logo) {
+          var img = el('img'); img.src = a.tema_logo + (a.tema_logo.indexOf('supabase.co') !== -1 ? '?v=' + Date.now() : '');
+          img.alt = '';
+          preview.appendChild(img);
+        } else {
+          preview.appendChild(el('p', 'p-note', 'Todavía no tiene logo.'));
+        }
+      }
+      pintarPreview();
+
+      var errLogo = el('div', 'p-err'); errLogo.style.display = 'none';
+      var inputLogo = el('input'); inputLogo.type = 'file'; inputLogo.accept = '.png,.jpg,.jpeg,.webp,.svg';
+      var subirLogo = el('button', 'btn sec', 'Subir logo'); subirLogo.type = 'button';
+
+      subirLogo.addEventListener('click', function () {
+        errLogo.style.display = 'none';
+        var file = inputLogo.files && inputLogo.files[0];
+        if (!file) { errLogo.textContent = 'Elige una imagen primero.'; errLogo.style.display = 'block'; return; }
+        if (file.size > MAX_LOGO) { errLogo.textContent = 'La imagen pesa más de 2 MB.'; errLogo.style.display = 'block'; return; }
+        var ext = TIPOS_LOGO[file.type];
+        if (!ext) { errLogo.textContent = 'Usa PNG, JPG, WEBP o SVG.'; errLogo.style.display = 'block'; return; }
+        var ruta = a.slug + '/logo.' + ext;
+        subirLogo.disabled = true;
+        ctx.api('/storage/v1/object/anunciantes-logos/' + ruta.split('/').map(encodeURIComponent).join('/'), {
+          method: 'POST', body: file, contentType: file.type, headers: { 'x-upsert': 'true' }
+        }).then(function (r) {
+          if (r.status === 401) { ctx.sesionCaducada(); return null; }
+          if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
+            throw new Error((b && b.message) || 'No se pudo subir el logo.');
+          });
+          return true;
+        }).then(function (ok) {
+          if (!ok) return;
+          var url = ctx.supabaseUrl + '/storage/v1/object/public/anunciantes-logos/' + ruta;
+          return ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
+            method: 'PATCH', body: JSON.stringify({ tema_logo: url })
+          }).then(function (r2) {
+            if (r2.status === 401) { ctx.sesionCaducada(); return; }
+            if (!r2.ok) throw new Error('El logo se subió pero no se pudo guardar en la ficha.');
+            a.tema_logo = url;
+            pintarPreview();
+            inputLogo.value = '';
+          });
+        }).catch(function (e) { errLogo.textContent = e.message; errLogo.style.display = 'block'; })
+          .then(function () { subirLogo.disabled = false; });
+      });
+
+      wrap.append(preview, errLogo, inputLogo, subirLogo);
+      return wrap;
+    }
+
     // 3.1 — Ficha: el resto de los datos de la campaña, editables aquí. Cambiar email_destino queda
     // auditado automáticamente (trigger en Supabase), sin nada que hacer desde este archivo.
     function bloqueFicha(a) {
       var sec = el('section', 'p-bloque');
       sec.appendChild(el('h2', 'p', 'Ficha'));
+      sec.appendChild(bloqueLogo(a));
       var form = el('form');
       var err = el('div', 'p-err'); err.style.display = 'none';
 
@@ -337,7 +400,6 @@
       var zona = campoTexto('Zona', 'text'); zona.input.value = a.zona || '';
       var color = campoTexto('Color principal del tema (hex)', 'text'); color.input.value = a.tema_color || ''; color.input.placeholder = '#1C4C98';
       var colorSec = campoTexto('Color secundario del tema (hex)', 'text'); colorSec.input.value = a.tema_color_secundario || '';
-      var logo = campoTexto('Logo (ruta en el repo, ej. /assets/anunciantes/' + a.slug + '.png)', 'text'); logo.input.value = a.tema_logo || '';
 
       var fCampos = el('div', 'field');
       fCampos.appendChild(el('label', 'lbl', 'Campos del formulario público'));
@@ -354,7 +416,7 @@
 
       var guardar = el('button', 'btn', 'Guardar ficha'); guardar.type = 'submit';
       form.append(err, nombre.wrap, emailDestino.wrap, fLimite, razon.wrap, cif.wrap, emailPriv.wrap,
-        sector.wrap, zona.wrap, color.wrap, colorSec.wrap, logo.wrap, fCampos, guardar);
+        sector.wrap, zona.wrap, color.wrap, colorSec.wrap, fCampos, guardar);
       sec.appendChild(form);
 
       form.addEventListener('submit', function (ev) {
@@ -367,10 +429,6 @@
         if (colorSecHex && !/^#[0-9a-fA-F]{6}$/.test(colorSecHex)) {
           err.textContent = 'El color secundario debe tener el formato #RRGGBB.'; err.style.display = 'block'; return;
         }
-        var logoVal = valOrNull(logo.input);
-        if (logoVal && !/^\/assets\/anunciantes\/[a-z0-9._-]+\.(png|svg|jpg|jpeg|webp)$/i.test(logoVal)) {
-          err.textContent = 'El logo debe ser una ruta como /assets/anunciantes/archivo.png.'; err.style.display = 'block'; return;
-        }
         var payload = {
           nombre_mostrado: nombre.input.value.trim(),
           email_destino: emailDestino.input.value.trim(),
@@ -382,7 +440,6 @@
           zona: valOrNull(zona.input),
           tema_color: colorHex,
           tema_color_secundario: colorSecHex,
-          tema_logo: logoVal,
           campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
         };
         guardar.disabled = true;

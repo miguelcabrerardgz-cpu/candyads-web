@@ -55,5 +55,9 @@ input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3
 .p-confirmacion{text-align:center;padding:12px 0 4px;}
 .p-confirmacion .btn{margin:6px;}
 .p-bloque{border-top:1px solid var(--border);margin-top:26px;padding-top:22px;}
+.logo-campo{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:14px;}
+.logo-preview{margin-bottom:10px;}
+.logo-preview img{max-width:160px;max-height:70px;border-radius:6px;background:#fff;padding:6px;border:1px solid var(--border);}
+.logo-campo input[type=file]{display:block;margin-bottom:10px;font-size:13px;}
 .archivo-fila{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
 .archivo-fila span{flex:1;font-size:14px;color:var(--ink);word-break:break-all;}

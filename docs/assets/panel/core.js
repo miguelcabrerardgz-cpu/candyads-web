@@ -27,6 +27,8 @@
     // contentType permite subir archivos (Supabase Storage) sin forzar application/json.
     if (opts.body != null) h['Content-Type'] = opts.contentType || 'application/json';
     if (token) h.Authorization = 'Bearer ' + token;
+    // headers: para cabeceras propias de Storage, p. ej. x-upsert al reemplazar un logo.
+    if (opts.headers) { for (var k in opts.headers) h[k] = opts.headers[k]; }
     return fetch(SUPABASE_URL + path, { method: opts.method || 'GET', headers: h, body: opts.body, cache: 'no-store' });
   }
 
@@ -124,7 +126,11 @@
   }
 
   // ctx.irA se asigna en shell() (necesita el "abrir" de la sesión actual); antes del login es un no-op.
-  var ctx = { el: el, clear: clear, api: api, ymd: ymd, tabla: tabla, sesionCaducada: sesionCaducada, irA: function () {} };
+  var ctx = {
+    el: el, clear: clear, api: api, ymd: ymd, tabla: tabla, sesionCaducada: sesionCaducada, irA: function () {},
+    // Pública ya (va embebida en este mismo archivo): sirve para construir URLs públicas de Storage.
+    supabaseUrl: SUPABASE_URL
+  };
 
   window.PanelCore = {
     registrar: function (h) { herramientas.push(h); },

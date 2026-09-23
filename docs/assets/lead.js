@@ -58,7 +58,9 @@
   }
 
   var HEX_RE = /^#[0-9a-fA-F]{6}$/;
-  var LOGO_RE = /^\/assets\/anunciantes\/[a-z0-9._-]+\.(png|svg|jpg|jpeg|webp)$/i;
+  // Acepta la ruta antigua (archivo commiteado en el repo) o la URL pública del bucket de logos
+  // subidos desde el panel (Supabase Storage, bucket anunciantes-logos).
+  var LOGO_RE = /^(\/assets\/anunciantes\/[a-z0-9._-]+\.(png|svg|jpg|jpeg|webp)|https:\/\/eceqcveqsbcfbmbaczed\.supabase\.co\/storage\/v1\/object\/public\/anunciantes-logos\/.+\.(png|svg|jpg|jpeg|webp))$/i;
 
   function rgb(hex) {
     return [1, 3, 5].map(function (i) { return parseInt(hex.substr(i, 2), 16); });
