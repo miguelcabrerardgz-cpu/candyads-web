@@ -441,33 +441,44 @@
         if (!ext) { errLogo.textContent = 'Usa PNG, JPG, WEBP o SVG.'; errLogo.style.display = 'block'; return; }
         var ruta = a.slug + '/logo.' + ext;
         subirLogo.disabled = true;
-        ctx.api('/storage/v1/object/anunciantes-logos/' + ruta.split('/').map(encodeURIComponent).join('/'), {
-          method: 'POST', body: file, contentType: file.type, headers: { 'x-upsert': 'true' }
-        }).then(function (r) {
+        Promise.all([
+          ctx.api('/storage/v1/object/anunciantes-logos/' + ruta.split('/').map(encodeURIComponent).join('/'), {
+            method: 'POST', body: file, contentType: file.type, headers: { 'x-upsert': 'true' }
+          }),
+          detectarColores(file)
+        ]).then(function (res) {
+          var r = res[0], colores = res[1];
           if (r.status === 401) { ctx.sesionCaducada(); return null; }
           if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
             throw new Error((b && b.message) || 'No se pudo subir el logo.');
           });
-          return true;
-        }).then(function (ok) {
-          if (!ok) return;
+          return colores;
+        }).then(function (colores) {
+          if (colores === undefined) return; // ya se gestionó (401)
           var url = ctx.supabaseUrl + '/storage/v1/object/public/anunciantes-logos/' + ruta;
+          // Los colores se guardan junto al logo, sin paso aparte: si solo rellenáramos el formulario
+          // a la espera de "Guardar ficha", quedan sin aplicar hasta que alguien pulse ese botón por
+          // separado — y eso es fácil de dar por hecho ya guardado, como pasó la primera vez con esto.
+          var payload = { tema_logo: url };
+          if (colores) {
+            payload.tema_color = colores.color;
+            payload.tema_color_secundario = colores.colorSecundario || null;
+          }
           return ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
-            method: 'PATCH', body: JSON.stringify({ tema_logo: url })
+            method: 'PATCH', body: JSON.stringify(payload)
           }).then(function (r2) {
             if (r2.status === 401) { ctx.sesionCaducada(); return; }
             if (!r2.ok) throw new Error('El logo se subió pero no se pudo guardar en la ficha.');
-            a.tema_logo = url;
+            Object.assign(a, payload);
             pintarPreview();
             inputLogo.value = '';
-            return detectarColores(file);
+            if (iColor) iColor.value = a.tema_color || '';
+            if (iColorSec) iColorSec.value = a.tema_color_secundario || '';
+            notaColores.textContent = colores
+              ? 'Logo y colores del tema guardados.'
+              : 'Logo guardado. No se pudieron detectar colores automáticamente; puedes escribirlos abajo y pulsar «Guardar ficha».';
+            notaColores.style.display = 'block';
           });
-        }).then(function (colores) {
-          if (!colores || !iColor) return;
-          iColor.value = colores.color;
-          if (colores.colorSecundario && iColorSec) iColorSec.value = colores.colorSecundario;
-          notaColores.textContent = 'Colores detectados del logo: revísalos abajo y pulsa «Guardar ficha» para aplicarlos.';
-          notaColores.style.display = 'block';
         }).catch(function (e) { errLogo.textContent = e.message; errLogo.style.display = 'block'; })
           .then(function () { subirLogo.disabled = false; });
       });
