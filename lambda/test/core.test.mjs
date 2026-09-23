@@ -9,20 +9,21 @@ const PERSONALES = ['Marta Prueba', '600123456', 'marta.prueba@example.com', 'Qu
 
 function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFalla = false } = {}) {
   const estado = { retos: new Set(), contador: 0, registro: new Map(), correos: [], logs: [], reloj: Date.now() };
-  const cfgSitio = config ?? { nombre_mostrado: 'La Casa Agency', activo: true, campos: ['nombre', 'telefono', 'email', 'interes_venta_alquiler', 'mensaje'] };
+  const cfgSitio = config ?? {
+    estado: 'activa', nombre_mostrado: 'La Casa Agency',
+    campos: ['nombre', 'telefono', 'email', 'interes_venta_alquiler', 'mensaje'],
+    tema_color: null, tema_color_secundario: null, tema_logo: null,
+    razon_social: null, cif: null, email_privacidad: null
+  };
 
   const fetchImpl = async (url, init) => {
     const u = String(url);
-    if (u.startsWith('https://candyads.es/data/anunciantes/')) {
-      const slug = u.split('/').pop().replace('.json', '');
-      if (slug !== 'lacasa-piloto') return { ok: false, status: 404, json: async () => ({}) };
-      return { ok: true, status: 200, json: async () => cfgSitio };
-    }
     if (u.startsWith('https://x.supabase.co/rest/v1/rpc/')) {
       const fn = u.split('/').pop();
       const a = JSON.parse(init.body);
       let out;
-      if (fn === 'destino_de') out = a.p_slug === 'lacasa-piloto' ? destino : null;
+      if (fn === 'config_publico_de') out = a.p_slug === 'lacasa-piloto' ? cfgSitio : null;
+      else if (fn === 'destino_de') out = a.p_slug === 'lacasa-piloto' ? destino : null;
       else if (fn === 'consumir_reto') { out = !estado.retos.has(a.p_huella); estado.retos.add(a.p_huella); }
       else if (fn === 'reservar_lead') { out = estado.contador < limite; if (out) estado.contador += 1; }
       else if (fn === 'reservar_lead_ref') { out = estado.contador < limite; if (out) { estado.contador += 1; estado.registro.set(a.p_ref, { slug: a.p_slug, estado: 'pendiente', recibidoEn: estado.reloj }); } }
@@ -80,6 +81,7 @@ function entorno({ limite = 100, config, destino = 'jose@lacasa.example', sesFal
 
 const cab = { origin: ORIGIN };
 const get = (handle, path = '/challenge', headers = cab) => handle({ method: 'GET', path, headers, body: '', ip: '1.1.1.1' });
+const config = (handle, slug, headers = cab) => handle({ method: 'GET', path: '/config', headers, body: '', ip: '1.1.1.1', query: { slug } });
 
 async function payloadAltcha(handle) {
   const r = await get(handle);
@@ -254,11 +256,45 @@ test('validaciones básicas', async () => {
 });
 
 test('anunciante inactivo o sin destino: 404', async () => {
-  const inactivo = entorno({ config: { nombre_mostrado: 'X', activo: false, campos: ['nombre'] } });
+  const inactivo = entorno({ config: { estado: 'pausada', nombre_mostrado: 'X', campos: ['nombre'] } });
   assert.equal(codigo(await enviar(inactivo.handle, {}, '6.6.6.1')), 'no_disponible');
   const sinDestino = entorno({ destino: null });
   assert.equal(codigo(await enviar(sinDestino.handle, {}, '6.6.6.2')), 'sin_destino');
   assert.equal(sinDestino.estado.correos.length, 0);
+});
+
+test('config pública: campaña activa devuelve ficha, sin activa solo el estado, inexistente da 404', async () => {
+  const { handle } = entorno({
+    config: {
+      estado: 'activa', nombre_mostrado: 'La Casa Agency', campos: ['nombre', 'telefono'],
+      tema_color: '#1C4C98', tema_color_secundario: '#909CCC', tema_logo: '/assets/anunciantes/lacasa.png',
+      razon_social: 'La Casa Agency SL', cif: 'B12345678', email_privacidad: 'privacidad@lacasa.example'
+    }
+  });
+  const r = await config(handle, 'lacasa-piloto');
+  assert.equal(r.statusCode, 200);
+  const c = JSON.parse(r.body);
+  assert.deepEqual(c, {
+    estado: 'activa', nombre_mostrado: 'La Casa Agency', campos: ['nombre', 'telefono'],
+    tema: { color: '#1C4C98', color_secundario: '#909CCC', logo: '/assets/anunciantes/lacasa.png' },
+    razon_social: 'La Casa Agency SL', nif_cif: 'B12345678', email_privacidad: 'privacidad@lacasa.example'
+  });
+
+  const pausada = entorno({ config: { estado: 'pausada', nombre_mostrado: 'La Casa Agency', campos: [] } });
+  const r2 = await config(pausada.handle, 'lacasa-piloto');
+  assert.equal(r2.statusCode, 200);
+  assert.deepEqual(JSON.parse(r2.body), { estado: 'pausada' }, 'no expone datos de la ficha si no está activa');
+
+  const r3 = await config(handle, 'no-existe');
+  assert.equal(r3.statusCode, 404);
+  assert.equal(codigo(r3), 'no_encontrado');
+});
+
+test('config pública: slug inválido da 400, origen no permitido da 403', async () => {
+  const { handle } = entorno();
+  assert.equal(codigo(await config(handle, '../../etc/passwd')), 'slug');
+  const r = await config(handle, 'lacasa-piloto', { origin: 'https://malo.example' });
+  assert.equal(r.statusCode, 403);
 });
 
 test('límite diario: el lead que lo supera recibe 429 y no se envía', async () => {
@@ -329,6 +365,8 @@ test('sin configuración completa el backend falla cerrado (no emite retos ni ac
   assert.equal(r2.statusCode, 500);
   const r3 = await handle({ method: 'POST', path: '/confirmar', headers: cab, body: '{}', ip: '1.1.1.3' });
   assert.equal(r3.statusCode, 500);
+  const r4 = await handle({ method: 'GET', path: '/config', headers: cab, body: '', ip: '1.1.1.4', query: { slug: 'lacasa-piloto' } });
+  assert.equal(r4.statusCode, 500);
   assert.ok(estado.logs.join('').includes('ALTCHA_HMAC_SECRET'));
   assert.ok(!estado.logs.join('').includes('sb_secret'));
 

@@ -15,6 +15,7 @@ const RETO_TTL_S = 10 * 60;
 const RETO_COST = 1000;
 const ENV_OBLIGATORIAS = ['ALLOWED_ORIGIN', 'SITE_URL', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY', 'ALTCHA_HMAC_SECRET', 'ALTCHA_HMAC_KEY_SECRET', 'SES_FROM'];
 const ENV_OBLIGATORIAS_CONTACTO = ['ALLOWED_ORIGIN', 'SES_FROM', 'CONTACT_TO'];
+const ENV_OBLIGATORIAS_CONFIG = ['ALLOWED_ORIGIN', 'SUPABASE_URL', 'SUPABASE_SECRET_KEY'];
 
 // req: { method, path, headers (en minúsculas), body (string), ip }
 // deps: { env, fetchImpl, sendEmail, altcha, now, log }
@@ -66,21 +67,47 @@ export function createHandler(deps) {
     return r.json();
   }
 
+  // Config de negocio (nombre + campos) para construir el correo del anunciante y validar el envío.
+  // Lee de Supabase (misma fuente que expone /config al navegador): un cambio de ficha o de estado desde
+  // el panel se aplica aquí de inmediato, sin depender del JSON estático que esto sustituye.
   async function cargarConfig(slug) {
     const hit = cfgCache.get(slug);
     if (hit && hit.exp > now()) return hit.val;
     let val = null;
     try {
-      const r = await fetchImpl(`${env.SITE_URL}/data/anunciantes/${slug}.json`, { headers: { accept: 'application/json' } });
-      if (r.ok) {
-        const c = await r.json();
-        if (c && c.activo !== false && typeof c.nombre_mostrado === 'string' && Array.isArray(c.campos)) {
-          val = { nombre: c.nombre_mostrado, campos: c.campos.filter((x) => typeof x === 'string') };
-        }
+      const c = await rpc('config_publico_de', { p_slug: slug });
+      if (c && c.estado === 'activa' && typeof c.nombre_mostrado === 'string' && Array.isArray(c.campos)) {
+        val = { nombre: c.nombre_mostrado, campos: c.campos.filter((x) => typeof x === 'string') };
       }
     } catch { /* se trata como no disponible */ }
     cfgCache.set(slug, { val, exp: now() + (val ? CFG_TTL : CFG_TTL_NEG) });
     return val;
+  }
+
+  // Config pública para /lead/<slug>: a diferencia de cargarConfig (uso interno, con caché), esta va sin
+  // caché porque la pide el navegador directamente y debe reflejar un cambio de estado al instante.
+  async function configPublica(req, cors) {
+    const fin = (status, cuerpo) => json(status, cuerpo, cors);
+    const slug = String((req.query && req.query.slug) || '');
+    if (!SLUG_RE.test(slug)) return fin(400, { ok: false, code: 'slug' });
+    let c;
+    try {
+      c = await rpc('config_publico_de', { p_slug: slug });
+    } catch (e) {
+      log.error(JSON.stringify({ evt: 'config_error', slug, error: (e && e.message) || 'error' }));
+      return fin(500, { ok: false, code: 'interno' });
+    }
+    if (!c) return fin(404, { ok: false, code: 'no_encontrado' });
+    if (c.estado !== 'activa') return fin(200, { estado: c.estado });
+    return fin(200, {
+      estado: c.estado,
+      nombre_mostrado: c.nombre_mostrado,
+      campos: c.campos,
+      tema: { color: c.tema_color, color_secundario: c.tema_color_secundario, logo: c.tema_logo },
+      razon_social: c.razon_social,
+      nif_cif: c.cif,
+      email_privacidad: c.email_privacidad
+    });
   }
 
   async function crearReto() {
@@ -305,11 +332,17 @@ export function createHandler(deps) {
       log.error(JSON.stringify({ evt: 'config_incompleta', faltan: faltanContacto }));
       return json(500, { ok: false, code: 'config' }, cors);
     }
+    const faltanConfig = ENV_OBLIGATORIAS_CONFIG.filter((k) => !env[k]);
+    if (faltanConfig.length && req.path.endsWith('/config')) {
+      log.error(JSON.stringify({ evt: 'config_incompleta', faltan: faltanConfig }));
+      return json(500, { ok: false, code: 'config' }, cors);
+    }
 
     if (req.method === 'GET' && req.path.endsWith('/challenge')) {
       try { return json(200, await crearReto(), cors); }
       catch (e) { log.error(JSON.stringify({ evt: 'reto_error', error: (e && e.name) || 'error' })); return json(500, { ok: false, code: 'interno' }, cors); }
     }
+    if (req.method === 'GET' && req.path.endsWith('/config')) return configPublica(req, cors);
     if (req.method === 'POST' && req.path.endsWith('/lead')) return lead(req, cors);
     if (req.method === 'POST' && req.path.endsWith('/confirmar')) return confirmar(req, cors);
     if (req.method === 'POST' && req.path.endsWith('/contacto')) return contactar(req, cors);

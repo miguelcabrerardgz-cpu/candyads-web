@@ -43,6 +43,7 @@ export const handler = async (event) => {
     path: event.rawPath || '',
     headers,
     body,
-    ip: event.requestContext.http.sourceIp
+    ip: event.requestContext.http.sourceIp,
+    query: event.queryStringParameters || {}
   });
 };

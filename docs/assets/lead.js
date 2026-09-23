@@ -40,11 +40,17 @@
     return SLUG_RE.test(s) ? s : null;
   }
 
+  // Config de la campaña: la sirve la Lambda desde Supabase (no un JSON del repo), para que un cambio de
+  // ficha o de estado hecho en el panel se refleje aquí al instante, sin caché de GitHub Pages de por medio.
   function loadConfig(slug) {
-    return fetch('/data/anunciantes/' + slug + '.json', { cache: 'no-cache', credentials: 'omit' })
-      .then(function (r) { if (!r.ok) throw new Error('no encontrado'); return r.json(); })
+    return fetch(ENDPOINT + '/config?slug=' + encodeURIComponent(slug), { cache: 'no-cache', credentials: 'omit' })
+      .then(function (r) {
+        if (r.status === 404) { var e = new Error('no encontrado'); e.noEncontrado = true; throw e; }
+        if (!r.ok) throw new Error('error');
+        return r.json();
+      })
       .then(function (c) {
-        if (!c || c.activo === false || typeof c.nombre_mostrado !== 'string' || !Array.isArray(c.campos)) {
+        if (!c || c.estado !== 'activa' || typeof c.nombre_mostrado !== 'string' || !Array.isArray(c.campos)) {
           throw new Error('inactivo');
         }
         return c;
@@ -328,9 +334,14 @@
       estadoVacio(app, 'Este enlace no es válido', 'Comprueba que has escaneado bien el código del sobre.');
       return;
     }
-    loadConfig(slug).then(function (cfg) { renderForm(app, slug, cfg); }).catch(function () {
-      estadoVacio(app, 'Este enlace ya no está activo',
-        'Si has llegado desde un sobre de azúcar, puede que la campaña haya terminado.');
+    loadConfig(slug).then(function (cfg) { renderForm(app, slug, cfg); }).catch(function (e) {
+      if (e && e.noEncontrado) {
+        estadoVacio(app, 'Este enlace ya no está activo',
+          'Si has llegado desde un sobre de azúcar, puede que la campaña haya terminado.');
+      } else {
+        estadoVacio(app, 'Gracias por tu interés',
+          'Este contacto no está disponible en este momento.');
+      }
     });
   }
 
