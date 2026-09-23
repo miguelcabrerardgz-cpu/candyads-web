@@ -268,6 +268,7 @@
       var volver = el('button', 'link', '← Campañas'); volver.type = 'button';
       volver.addEventListener('click', cargarLista);
       head.appendChild(volver);
+      head.appendChild(botonEliminar(a));
       cont.appendChild(head);
       cont.appendChild(el('h1', 'p-h1', a.nombre_mostrado || a.slug));
 
@@ -275,30 +276,41 @@
       cont.appendChild(bloqueFicha(a));
       cont.appendChild(bloqueTrazabilidad(a));
       cont.appendChild(bloqueArchivos(a));
-      cont.appendChild(bloqueEliminar(a));
     }
 
-    // Borrado de la campaña: separado al final y con estilo de aviso, para que no se confunda con las
-    // demás acciones. Solo borra la ficha (anunciantes_destino) — los leads ya recibidos se quedan en
-    // la base de datos (no hay borrado en cascada), pero dejan de verse desde el panel al no quedar
-    // ninguna campaña a la que asociarlos. Por eso la confirmación deja claro que "Finalizada" es la
-    // alternativa si lo que se quiere es retirarla sin perder ese acceso.
-    function bloqueEliminar(a) {
-      var sec = el('section', 'p-bloque p-peligro');
-      sec.appendChild(el('h2', 'p', 'Eliminar campaña'));
-      sec.appendChild(el('p', 'p-note',
-        'Borra la ficha de esta campaña de forma permanente. Si solo quieres retirarla sin perder el acceso a su historial, usa el estado «Finalizada» más arriba en vez de esto.'));
-      var errDel = el('div', 'p-err'); errDel.style.display = 'none';
-      var btn = el('button', 'btn peligro', 'Eliminar campaña'); btn.type = 'button';
+    function iconoPapelera() {
+      var NS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '16'); svg.setAttribute('height', '16');
+      svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round'); svg.setAttribute('stroke-linejoin', 'round');
+      var path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13');
+      svg.appendChild(path);
+      return svg;
+    }
+
+    // Borrado de la campaña: icono discreto en la cabecera, no un botón grande junto a las demás
+    // acciones. Solo borra la ficha (anunciantes_destino) — los leads ya recibidos se quedan en la
+    // base de datos (no hay borrado en cascada), pero dejan de verse desde el panel al no quedar
+    // ninguna campaña a la que asociarlos; el popup de confirmación lo explica antes de que se pueda
+    // pulsar "Aceptar" por error, y sugiere "Finalizada" como alternativa si no se quiere perder eso.
+    function botonEliminar(a) {
+      var btn = el('button', 'btn-icono peligro'); btn.type = 'button';
+      btn.title = 'Eliminar campaña';
+      btn.setAttribute('aria-label', 'Eliminar campaña');
+      btn.appendChild(iconoPapelera());
 
       btn.addEventListener('click', function () {
-        errDel.style.display = 'none';
         var nombre = a.nombre_mostrado || a.slug;
         var ok = confirm(
           '¿Eliminar la campaña «' + nombre + '»?\n\n' +
           'Se borra su ficha (nombre, contactos, tema, campos del formulario) de forma permanente. ' +
           'Los leads que ya ha recibido NO se borran de la base de datos, pero dejarán de verse desde ' +
           'el panel porque no quedará ninguna campaña a la que asociarlos.\n\n' +
+          'Si solo quieres retirarla sin perder ese acceso, cierra este aviso y cambia su estado a ' +
+          '«Finalizada» en vez de borrarla.\n\n' +
           'Esta acción no se puede deshacer. ¿Seguro?'
         );
         if (!ok) return;
@@ -309,11 +321,10 @@
             if (!r.ok) throw new Error('No se pudo eliminar la campaña.');
             cargarLista();
           })
-          .catch(function (e) { errDel.textContent = e.message; errDel.style.display = 'block'; btn.disabled = false; });
+          .catch(function (e) { alert(e.message); btn.disabled = false; });
       });
 
-      sec.append(errDel, btn);
-      return sec;
+      return btn;
     }
 
     // 3.2 — Estado: separado de la ficha porque es la acción más urgente (dar de baja un QR ya impreso
