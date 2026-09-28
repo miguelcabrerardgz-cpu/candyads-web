@@ -478,21 +478,73 @@
       });
     }
 
-    function bloqueLogo(a, iColor, iColorSec) {
+    // Recorta los márgenes vacíos (transparentes, o del color de la esquina si la imagen es opaca) antes de
+    // subir el logo: un PNG de 447×447 con el logo real en una franja de 396×96 salía diminuto en la landing
+    // (diagnóstico de la Fase 0). SVG se sube tal cual; si no hay casi nada que recortar, el archivo original.
+    function recortarMargenes(file) {
+      if (file.type === 'image/svg+xml') return Promise.resolve(file);
+      return new Promise(function (resolve) {
+        var url = URL.createObjectURL(file), img = new Image();
+        function fin(x) { URL.revokeObjectURL(url); resolve(x); }
+        img.onerror = function () { fin(file); };
+        img.onload = function () {
+          try {
+            var w = img.naturalWidth, h = img.naturalHeight;
+            var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+            var cx = cv.getContext('2d'); cx.drawImage(img, 0, 0);
+            var d = cx.getImageData(0, 0, w, h).data;
+            var f = [d[0], d[1], d[2], d[3]];
+            function vacio(i) {
+              if (d[i + 3] < 16) return true;
+              if (f[3] < 16) return false;
+              return Math.abs(d[i] - f[0]) + Math.abs(d[i + 1] - f[1]) + Math.abs(d[i + 2] - f[2]) < 40;
+            }
+            var x0 = w, y0 = h, x1 = -1, y1 = -1;
+            for (var y = 0; y < h; y++) {
+              for (var x = 0; x < w; x++) {
+                if (vacio((y * w + x) * 4)) continue;
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                y1 = y;
+              }
+            }
+            if (x1 < 0) { fin(file); return; }
+            var m = Math.round(Math.max(x1 - x0, y1 - y0) * 0.03);
+            x0 = Math.max(0, x0 - m); y0 = Math.max(0, y0 - m); x1 = Math.min(w - 1, x1 + m); y1 = Math.min(h - 1, y1 + m);
+            var cw = x1 - x0 + 1, ch = y1 - y0 + 1;
+            if (cw * ch > w * h * 0.9) { fin(file); return; }
+            var out = document.createElement('canvas'); out.width = cw; out.height = ch;
+            out.getContext('2d').drawImage(cv, x0, y0, cw, ch, 0, 0, cw, ch);
+            out.toBlob(function (b) { fin(b && TIPOS_LOGO[b.type] ? b : file); }, file.type, 0.92);
+          } catch (e) { fin(file); }
+        };
+        img.src = url;
+      });
+    }
+
+    function bloqueLogo(a, iColor, iColorSec, iEscala) {
       var wrap = el('div', 'field logo-campo');
       wrap.appendChild(el('label', 'lbl', 'Logo'));
       var preview = el('div', 'logo-preview');
+      // Vista previa al mismo tamaño que en /lead/<slug> (misma regla que .adv-head img en lead.css).
+      function aplicarEscala() {
+        if (iEscala) preview.style.setProperty('--logo-escala', String(parseInt(iEscala.value, 10) / 100));
+      }
       function pintarPreview() {
         ctx.clear(preview);
         if (a.tema_logo) {
+          var muestra = el('div', 'logo-muestra');
           var img = el('img'); img.src = a.tema_logo + (a.tema_logo.indexOf('supabase.co') !== -1 ? '?v=' + Date.now() : '');
           img.alt = '';
-          preview.appendChild(img);
+          muestra.appendChild(img);
+          preview.appendChild(muestra);
         } else {
           preview.appendChild(el('p', 'p-note', 'Todavía no tiene logo.'));
         }
       }
       pintarPreview();
+      aplicarEscala();
 
       var errLogo = el('div', 'p-err'); errLogo.style.display = 'none';
       var notaColores = el('p', 'p-note'); notaColores.style.display = 'none';
@@ -505,16 +557,18 @@
         var file = inputLogo.files && inputLogo.files[0];
         if (!file) { errLogo.textContent = 'Elige una imagen primero.'; errLogo.style.display = 'block'; return; }
         if (file.size > MAX_LOGO) { errLogo.textContent = 'La imagen pesa más de 2 MB.'; errLogo.style.display = 'block'; return; }
-        var ext = TIPOS_LOGO[file.type];
-        if (!ext) { errLogo.textContent = 'Usa PNG, JPG, WEBP o SVG.'; errLogo.style.display = 'block'; return; }
-        var ruta = a.slug + '/logo.' + ext;
+        if (!TIPOS_LOGO[file.type]) { errLogo.textContent = 'Usa PNG, JPG, WEBP o SVG.'; errLogo.style.display = 'block'; return; }
+        var ruta;
         subirLogo.disabled = true;
-        Promise.all([
-          ctx.api('/storage/v1/object/anunciantes-logos/' + ruta.split('/').map(encodeURIComponent).join('/'), {
-            method: 'POST', body: file, contentType: file.type, headers: { 'x-upsert': 'true' }
-          }),
-          detectarColores(file)
-        ]).then(function (res) {
+        recortarMargenes(file).then(function (arch) {
+          ruta = a.slug + '/logo.' + TIPOS_LOGO[arch.type];
+          return Promise.all([
+            ctx.api('/storage/v1/object/anunciantes-logos/' + ruta.split('/').map(encodeURIComponent).join('/'), {
+              method: 'POST', body: arch, contentType: arch.type, headers: { 'x-upsert': 'true' }
+            }),
+            detectarColores(arch)
+          ]);
+        }).then(function (res) {
           var r = res[0], colores = res[1];
           if (r.status === 401) { ctx.sesionCaducada(); return null; }
           if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
@@ -552,6 +606,13 @@
       });
 
       wrap.append(preview, errLogo, inputLogo, subirLogo, notaColores);
+      if (iEscala) {
+        var etq = el('label', 'lbl logo-escala-lbl');
+        function rotulo() { etq.textContent = 'Tamaño del logo en el formulario: ' + iEscala.value + '% (se guarda con «Guardar ficha»)'; }
+        rotulo();
+        iEscala.addEventListener('input', function () { rotulo(); aplicarEscala(); });
+        wrap.append(etq, iEscala);
+      }
       return wrap;
     }
 
@@ -579,7 +640,14 @@
 
       // El logo se sube aparte (bloqueLogo), pero al detectar sus colores rellena estos mismos campos
       // para revisarlos antes de guardar la ficha.
-      sec.appendChild(bloqueLogo(a, color.input, colorSec.input));
+      // Escala del logo (50–200 %). Solo si la columna ya existe (migración 20260929000000_logo_escala.sql):
+      // así este archivo se puede publicar antes que la migración sin romper "Guardar ficha".
+      var iEscala = null;
+      if (Object.prototype.hasOwnProperty.call(a, 'logo_landing_escala')) {
+        iEscala = el('input'); iEscala.type = 'range'; iEscala.min = 50; iEscala.max = 200; iEscala.step = 5;
+        iEscala.value = a.logo_landing_escala || 100;
+      }
+      sec.appendChild(bloqueLogo(a, color.input, colorSec.input, iEscala));
 
       var fCampos = el('div', 'field');
       fCampos.appendChild(el('label', 'lbl', 'Campos del formulario público'));
@@ -623,6 +691,7 @@
           tema_color_secundario: colorSecHex,
           campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
         };
+        if (iEscala) payload.logo_landing_escala = parseInt(iEscala.value, 10);
         // email_destino decide a quién llegan los datos personales de cada lead: una errata los manda a otra
         // persona. Por eso, si cambia, se pide confirmación mostrando el antes y el después.
         var cambiaDestino = payload.email_destino.toLowerCase() !== String(a.email_destino || '').toLowerCase();

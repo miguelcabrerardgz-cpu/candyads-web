@@ -57,7 +57,10 @@ input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3
 .p-bloque{border-top:1px solid var(--border);margin-top:26px;padding-top:22px;}
 .logo-campo{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:14px;}
 .logo-preview{margin-bottom:10px;}
-.logo-preview img{max-width:160px;max-height:70px;border-radius:6px;background:#fff;padding:6px;border:1px solid var(--border);}
+.logo-muestra{max-width:360px;background:#fff;border:1px solid var(--border);border-radius:11px;padding:14px;display:flex;justify-content:center;}
+.logo-muestra img{height:calc(72px * var(--logo-escala, 1));width:auto;max-width:100%;object-fit:contain;display:block;}
+.logo-campo input[type=range]{width:100%;max-width:360px;accent-color:var(--adv);}
+.logo-escala-lbl{margin-top:14px;}
 .logo-campo input[type=file]{display:block;margin-bottom:10px;font-size:13px;}
 .archivo-fila{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
 .archivo-fila span{flex:1;font-size:14px;color:var(--ink);word-break:break-all;}

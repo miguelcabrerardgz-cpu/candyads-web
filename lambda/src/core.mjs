@@ -103,7 +103,7 @@ export function createHandler(deps) {
       estado: c.estado,
       nombre_mostrado: c.nombre_mostrado,
       campos: c.campos,
-      tema: { color: c.tema_color, color_secundario: c.tema_color_secundario, logo: c.tema_logo },
+      tema: { color: c.tema_color, color_secundario: c.tema_color_secundario, logo: c.tema_logo, logo_escala: c.logo_landing_escala },
       razon_social: c.razon_social,
       nif_cif: c.cif,
       email_privacidad: c.email_privacidad

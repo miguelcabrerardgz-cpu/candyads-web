@@ -87,6 +87,8 @@
       head.appendChild(el('span', { 'class': 'adv-name' }, cfg.nombre_mostrado));
     }
     if (typeof logo === 'string' && LOGO_RE.test(logo)) {
+      var escala = Number(cfg.tema.logo_escala);
+      if (escala >= 50 && escala <= 200) head.style.setProperty('--logo-escala', String(escala / 100));
       var img = el('img', { src: logo, alt: cfg.nombre_mostrado });
       img.addEventListener('error', texto);
       head.appendChild(img);

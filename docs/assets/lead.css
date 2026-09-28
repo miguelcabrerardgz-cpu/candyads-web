@@ -45,7 +45,10 @@ a{color:var(--adv);}
   display:flex;justify-content:center;align-items:center;
   padding:4px 0 20px;margin-bottom:20px;border-bottom:1px solid var(--border);
 }
-.adv-head img{height:48px;width:auto;max-width:78%;display:block;}
+/* Altura fija (72px × escala de la campaña, 100% por defecto) y contain: ni se recorta ni se deforma, sea
+   cuadrado o alargado; si es muy ancho, lo frena max-width. Los márgenes en blanco de la imagen se recortan al
+   subirla desde el panel: antes eran la causa principal de que el logo se viera diminuto. */
+.adv-head img{height:calc(72px * var(--logo-escala, 1));width:auto;max-width:100%;object-fit:contain;display:block;}
 .adv-head .adv-name{font-family:Georgia,serif;font-weight:700;font-size:24px;color:var(--adv);}
 .eyebrow{
   font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
