@@ -64,6 +64,12 @@ input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3
 .btn-icono{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border-radius:8px;cursor:pointer;flex-shrink:0;}
 .btn-icono.peligro{background:#fff;color:var(--err);border:1px solid var(--err);}
 .btn-icono.peligro:hover{background:var(--err-bg);}
+button.btn.mini{width:auto;padding:7px 14px;font-size:13px;border-radius:9px;}
+.enlace{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.enlace a{color:var(--adv);font-size:15px;font-weight:600;word-break:break-all;}
+.enlace.compacto{flex-wrap:nowrap;gap:8px;}
+.enlace.compacto a{font-size:13px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+table.p th.izq,table.p td.izq{text-align:left;}
 .mfa-qr{display:flex;justify-content:center;margin:12px 0 16px;}
 .mfa-qr svg{width:220px;height:220px;display:block;background:#fff;border:1px solid var(--border);border-radius:10px;}
 .mfa-pasos{margin:0 0 12px;padding-left:22px;font-size:15px;line-height:1.5;color:var(--ink);}

@@ -25,6 +25,11 @@
   ];
   var MAX_ARCHIVO = 15 * 1024 * 1024;
 
+  // Dirección que lleva el QR impreso. No se guarda en la base de datos: sale siempre del slug, que no se
+  // puede cambiar desde el panel (no va en el PATCH de la ficha), así que es la misma el día del alta y meses
+  // después. Mismo prefijo que BASE en qr.js.
+  var BASE_LEAD = 'https://candyads.es/lead/';
+
   var hora = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   var diaMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
   var ETQ = { enviado: 'Enviado', error: 'Error de envío', pendiente: 'Sin confirmar' };
@@ -91,7 +96,9 @@
       }
 
       var t = el('table', 'p'), cabecera = el('tr');
-      ['Campaña', 'Estado', 'Leads este mes', 'Conversión'].forEach(function (h) { cabecera.appendChild(el('th', null, h)); });
+      ['Campaña', 'Estado', 'Enlace del QR', 'Leads este mes', 'Conversión'].forEach(function (h, i) {
+        cabecera.appendChild(el('th', i === 2 ? 'izq' : null, h));
+      });
       t.appendChild(cabecera);
       anunciantes.forEach(function (a) {
         var tr = el('tr'); tr.className = 'clic';
@@ -101,6 +108,11 @@
         var info = ESTADOS[a.estado] || { etiqueta: a.estado, clase: '' };
         tdEstado.appendChild(el('span', 'badge ' + info.clase, info.etiqueta));
         tr.appendChild(tdEstado);
+        // Solo los QR vivos (activa/pausada): de un vistazo, qué enlaces hay ahora mismo en la calle.
+        var tdEnlace = el('td', 'izq');
+        if (a.estado === 'activa' || a.estado === 'pausada') tdEnlace.appendChild(enlaceQr(a.slug, true));
+        else tdEnlace.textContent = '—';
+        tr.appendChild(tdEnlace);
         tr.appendChild(el('td', 'n', String(leadsPorMes[a.slug] || 0)));
         var conv = conversionPorSlug[a.slug];
         tr.appendChild(el('td', 'n', conv && conv.total ? Math.round(conv.venta / conv.total * 100) + '%' : '—'));
@@ -122,6 +134,36 @@
     }
 
     function valOrNull(input) { var v = input.value.trim(); return v === '' ? null : v; }
+
+    // Enlace del QR (seleccionable y clicable) + botón de copiar. compacto: versión corta del listado.
+    function enlaceQr(slug, compacto) {
+      var url = BASE_LEAD + slug;
+      var etiqueta = compacto ? 'Copiar' : 'Copiar enlace';
+      var w = el('div', 'enlace' + (compacto ? ' compacto' : ''));
+      var a = el('a', null, compacto ? url.replace(/^https:\/\//, '') : url);
+      a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.title = url;
+      var b = el('button', 'btn sec mini', etiqueta); b.type = 'button';
+      // En el listado la fila entera abre la ficha: estos dos clics no deben llegar a la fila.
+      [a, b].forEach(function (n) { n.addEventListener('click', function (ev) { ev.stopPropagation(); }); });
+      var reloj = null;
+      function avisar(texto) {
+        b.textContent = texto;
+        clearTimeout(reloj);
+        reloj = setTimeout(function () { b.textContent = etiqueta; }, 2000);
+      }
+      // Si el navegador no deja escribir en el portapapeles, se deja el texto seleccionado para Ctrl+C.
+      function aMano() {
+        var r = document.createRange(); r.selectNodeContents(a);
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+        avisar('Pulsa Ctrl+C');
+      }
+      b.addEventListener('click', function () {
+        if (!navigator.clipboard) { aMano(); return; }
+        navigator.clipboard.writeText(url).then(function () { avisar('Copiado ✓'); }, aMano);
+      });
+      w.append(a, b);
+      return w;
+    }
 
     // ---------- Alta ----------
 
@@ -272,6 +314,7 @@
       cont.appendChild(head);
       cont.appendChild(el('h1', 'p-h1', a.nombre_mostrado || a.slug));
 
+      cont.appendChild(bloqueEnlace(a));
       cont.appendChild(bloqueEstado(a));
       cont.appendChild(bloqueFicha(a));
       cont.appendChild(bloqueTrazabilidad(a));
@@ -325,6 +368,20 @@
       });
 
       return btn;
+    }
+
+    // Enlace del QR: siempre a la vista en la ficha, no solo en la pantalla de "Campaña creada".
+    function bloqueEnlace(a) {
+      var sec = el('section', 'p-bloque');
+      sec.appendChild(el('h2', 'p', 'Enlace del QR'));
+      var fila = enlaceQr(a.slug, false);
+      var qr = el('button', 'btn sec mini', 'Generar su QR'); qr.type = 'button';
+      qr.addEventListener('click', function () { ctx.irA('qr', a.slug); });
+      fila.appendChild(qr);
+      sec.appendChild(fila);
+      sec.appendChild(el('p', 'p-note', 'Es la dirección que lleva el QR impreso y no cambia nunca: pausar, ' +
+        'reanudar o finalizar la campaña no obliga a reimprimirlo.'));
+      return sec;
     }
 
     // 3.2 — Estado: separado de la ficha porque es la acción más urgente (dar de baja un QR ya impreso
