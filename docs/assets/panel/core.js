@@ -65,7 +65,52 @@
   }
 
   function jsonDe(r) {
-    return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+    return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; });
+  }
+
+  // QR del alta, generado aquí a partir de totp.uri con la misma librería del generador de QR (qrcode-lib.js,
+  // alojada en el sitio). No se usa totp.qr_code: la API de Supabase lo devuelve como SVG en bruto, sin "data:"
+  // delante (el prefijo lo añade supabase-js, que aquí no se usa), y puesto como src de una <img> sale roto.
+  function qrDe(texto) {
+    var qr = qrcode(0, 'M');
+    qr.addData(texto);
+    qr.make();
+    var n = qr.getModuleCount(), q = 4, t = n + q * 2, d = '';
+    for (var r = 0; r < n; r++) {
+      var c = 0;
+      while (c < n) {
+        if (qr.isDark(r, c)) {
+          var ini = c;
+          while (c < n && qr.isDark(r, c)) c++;
+          d += 'M' + (ini + q) + ' ' + (r + q) + 'h' + (c - ini) + 'v1h-' + (c - ini) + 'z';
+        } else c++;
+      }
+    }
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 ' + t + ' ' + t);
+    svg.setAttribute('shape-rendering', 'crispEdges');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', 'Código QR para la app de autenticación');
+    var fondo = document.createElementNS(NS, 'rect');
+    fondo.setAttribute('width', t); fondo.setAttribute('height', t); fondo.setAttribute('fill', '#fff');
+    var modulos = document.createElementNS(NS, 'path');
+    modulos.setAttribute('d', d); modulos.setAttribute('fill', '#000');
+    svg.append(fondo, modulos);
+    return svg;
+  }
+
+  // Texto para el usuario según el error_code de Supabase Auth (el cuerpo de error es {code, error_code, msg}).
+  function errorMfa(r, alta) {
+    var c = r.j && r.j.error_code;
+    if (r.status === 429 || c === 'over_request_rate_limit') return 'Demasiados intentos seguidos. Espera 5 minutos y vuelve a probar.';
+    if (c === 'mfa_verification_failed') {
+      return alta
+        ? 'Código incorrecto. Usa la entrada que acabas de añadir con ESTE código QR: si en la app tienes otras de ' +
+          '«Candy Ads» de intentos anteriores, bórralas, ya no sirven. Comprueba también que la hora del móvil está en automático.'
+        : 'Código incorrecto o caducado. Escribe el que muestre ahora la app (cambia cada 30 segundos).';
+    }
+    return 'No se pudo verificar el código (' + (c || r.status) + '). Vuelve a intentarlo.';
   }
 
   // Segundo factor (TOTP) con el MFA nativo de Supabase Auth. Tras la contraseña la sesión es aal1 y la
@@ -98,21 +143,55 @@
     });
   }
 
+  // Reto nuevo + verificación. Devuelve el access_token aal2.
+  function verificar(factorId, codigo, alta, reintento) {
+    return api('/auth/v1/factors/' + factorId + '/challenge', { method: 'POST', body: '{}' })
+      .then(jsonDe)
+      .then(function (r) {
+        if (!r.ok || !r.j.id) throw new Error(errorMfa(r, alta));
+        return api('/auth/v1/factors/' + factorId + '/verify', {
+          method: 'POST', body: JSON.stringify({ challenge_id: r.j.id, code: codigo })
+        }).then(jsonDe);
+      })
+      .then(function (r) {
+        // Supabase exige que el reto y la verificación lleguen desde la misma IP. Si la conexión cambia de IP justo
+        // entre las dos llamadas (pasa en redes móviles), se repite una vez con un reto nuevo.
+        var c = r.j && r.j.error_code;
+        if (!r.ok && !reintento && (c === 'mfa_ip_address_mismatch' || c === 'mfa_challenge_expired')) {
+          return verificar(factorId, codigo, alta, true);
+        }
+        if (!r.ok || !r.j.access_token) throw new Error(errorMfa(r, alta));
+        return r.j.access_token;
+      });
+  }
+
   // totp != null: alta del factor (se muestra el QR). totp == null: login normal, solo el código.
   function pantallaCodigo(factorId, totp) {
     clear();
     app.appendChild(el('div', 'eyebrow', 'Uso interno'));
     app.appendChild(el('h1', null, totp ? 'Activa la verificación en dos pasos' : 'Verificación en dos pasos'));
     if (totp) {
-      app.appendChild(el('p', 'lead', 'Escanea este código con una app de autenticación (Google Authenticator, ' +
-        'Microsoft Authenticator, 1Password…) y escribe el código de 6 dígitos que te muestre. Solo se hace una vez.'));
+      // Cada alta genera una clave nueva e invalida las anteriores: si el usuario ya añadió una entrada en un intento
+      // previo (o recarga la página a medias), los códigos de esa entrada vieja no valen. Por eso el paso 1.
+      var pasos = el('ol', 'mfa-pasos');
+      pasos.append(
+        el('li', null, 'Abre Google Authenticator (u otra app de autenticación). Si ya tienes alguna entrada «Candy Ads» ' +
+          'de un intento anterior, bórrala: ya no sirve.'),
+        el('li', null, 'Pulsa «+» → «Escanear un código QR» y escanea este código:'));
+      app.appendChild(pasos);
       var qr = el('div', 'mfa-qr');
-      var img = el('img'); img.src = totp.qr_code; img.alt = 'Código QR para la app de autenticación';
-      qr.appendChild(img);
+      qr.appendChild(qrDe(totp.uri));
       app.appendChild(qr);
-      var manual = el('p', 'p-note', '¿No puedes escanearlo? Escribe esta clave a mano en la app: ');
-      manual.appendChild(el('code', 'mfa-clave', totp.secret));
+      var manual = el('p', 'p-note', '¿No puedes escanearlo? En la app elige «Introducir una clave de configuración», ' +
+        'pon de nombre Candy Ads, tipo «Basada en el tiempo», y esta clave: ');
+      manual.appendChild(el('code', 'mfa-clave', totp.secret.replace(/(.{4})/g, '$1 ').trim()));
       app.appendChild(manual);
+      var pasos3 = el('ol', 'mfa-pasos');
+      pasos3.start = 3;
+      pasos3.appendChild(el('li', null, 'Escribe abajo el código de 6 dígitos que aparece en esa entrada nueva.'));
+      app.appendChild(pasos3);
+      app.appendChild(el('p', 'p-note mfa-aviso', 'No recargues ni cierres esta página hasta terminar: si lo haces, este código QR ' +
+        'deja de valer y saldrá otro distinto.'));
     } else {
       app.appendChild(el('p', 'lead', 'Escribe el código de 6 dígitos que muestra tu app de autenticación.'));
     }
@@ -121,7 +200,8 @@
     var err = el('div', 'p-err'); err.style.display = 'none';
     var f = el('div', 'field');
     var i = el('input');
-    i.type = 'text'; i.inputMode = 'numeric'; i.autocomplete = 'one-time-code'; i.maxLength = 6; i.required = true;
+    // Sin maxLength 6: Google Authenticator muestra el código como "123 456" y al pegarlo se cortaría.
+    i.type = 'text'; i.inputMode = 'numeric'; i.autocomplete = 'one-time-code'; i.maxLength = 12; i.required = true;
     f.append(el('label', 'lbl', 'Código'), i);
     var b = el('button', 'btn', totp ? 'Activar y entrar' : 'Entrar'); b.type = 'submit';
     form.append(err, f, b);
@@ -134,22 +214,13 @@
 
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
-      var codigo = i.value.replace(/\s+/g, '');
+      var codigo = i.value.replace(/\D+/g, '');
       if (!/^[0-9]{6}$/.test(codigo)) { mostrar('El código tiene 6 dígitos.'); return; }
       b.disabled = true; err.style.display = 'none';
       // Un reto nuevo por intento: si el código anterior falló, no se reutiliza su reto.
-      api('/auth/v1/factors/' + factorId + '/challenge', { method: 'POST', body: '{}' })
-        .then(jsonDe)
-        .then(function (r) {
-          if (!r.ok || !r.j.id) throw new Error('No se pudo pedir el código. Vuelve a intentarlo.');
-          return api('/auth/v1/factors/' + factorId + '/verify', {
-            method: 'POST', body: JSON.stringify({ challenge_id: r.j.id, code: codigo })
-          });
-        })
-        .then(jsonDe)
-        .then(function (r) {
-          if (!r.ok || !r.j.access_token) throw new Error('Código incorrecto o caducado. Prueba con el que muestre ahora la app.');
-          token = r.j.access_token; // sesión aal2: a partir de aquí la RLS deja leer
+      verificar(factorId, codigo, !!totp, false)
+        .then(function (aal2) {
+          token = aal2; // sesión aal2: a partir de aquí la RLS deja leer
           return rpcBool('es_admin');
         })
         .then(function (esAdmin) {
