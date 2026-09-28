@@ -58,6 +58,108 @@
 
   function salir() { token = null; login(); }
 
+  function rpcBool(fn) {
+    return api('/rest/v1/rpc/' + fn, { method: 'POST', body: '{}' })
+      .then(function (r) { return r.ok ? r.json() : false; })
+      .then(function (v) { return v === true; });
+  }
+
+  function jsonDe(r) {
+    return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, j: j }; });
+  }
+
+  // Segundo factor (TOTP) con el MFA nativo de Supabase Auth. Tras la contraseña la sesión es aal1 y la
+  // base de datos no deja leer nada (es_admin() exige aal2): este paso la sube a aal2.
+  // Primera vez: se inscribe la app (QR). Después: solo se pide el código.
+  function pasoMfa() {
+    return api('/auth/v1/user')
+      .then(function (r) {
+        if (!r.ok) throw new Error('No se pudo comprobar la verificación en dos pasos.');
+        return r.json();
+      })
+      .then(function (u) {
+        var totp = (u.factors || []).filter(function (f) { return f.factor_type === 'totp'; });
+        var verificado = totp.filter(function (f) { return f.status === 'verified'; })[0];
+        if (verificado) { pantallaCodigo(verificado.id, null); return; }
+        // Inscripciones que se quedaron a medias (QR mostrado pero nunca confirmado): se borran antes de
+        // empezar otra, para no acumular factores sin verificar.
+        return Promise.all(totp.map(function (f) { return api('/auth/v1/factors/' + f.id, { method: 'DELETE' }); }))
+          .then(inscribir);
+      });
+  }
+
+  function inscribir() {
+    return api('/auth/v1/factors', {
+      method: 'POST',
+      body: JSON.stringify({ factor_type: 'totp', issuer: 'Candy Ads', friendly_name: 'Panel Candy Ads ' + new Date().toISOString() })
+    }).then(jsonDe).then(function (r) {
+      if (!r.ok || !r.j.id || !r.j.totp) throw new Error('No se pudo iniciar la verificación en dos pasos.');
+      pantallaCodigo(r.j.id, r.j.totp);
+    });
+  }
+
+  // totp != null: alta del factor (se muestra el QR). totp == null: login normal, solo el código.
+  function pantallaCodigo(factorId, totp) {
+    clear();
+    app.appendChild(el('div', 'eyebrow', 'Uso interno'));
+    app.appendChild(el('h1', null, totp ? 'Activa la verificación en dos pasos' : 'Verificación en dos pasos'));
+    if (totp) {
+      app.appendChild(el('p', 'lead', 'Escanea este código con una app de autenticación (Google Authenticator, ' +
+        'Microsoft Authenticator, 1Password…) y escribe el código de 6 dígitos que te muestre. Solo se hace una vez.'));
+      var qr = el('div', 'mfa-qr');
+      var img = el('img'); img.src = totp.qr_code; img.alt = 'Código QR para la app de autenticación';
+      qr.appendChild(img);
+      app.appendChild(qr);
+      var manual = el('p', 'p-note', '¿No puedes escanearlo? Escribe esta clave a mano en la app: ');
+      manual.appendChild(el('code', 'mfa-clave', totp.secret));
+      app.appendChild(manual);
+    } else {
+      app.appendChild(el('p', 'lead', 'Escribe el código de 6 dígitos que muestra tu app de autenticación.'));
+    }
+
+    var form = el('form');
+    var err = el('div', 'p-err'); err.style.display = 'none';
+    var f = el('div', 'field');
+    var i = el('input');
+    i.type = 'text'; i.inputMode = 'numeric'; i.autocomplete = 'one-time-code'; i.maxLength = 6; i.required = true;
+    f.append(el('label', 'lbl', 'Código'), i);
+    var b = el('button', 'btn', totp ? 'Activar y entrar' : 'Entrar'); b.type = 'submit';
+    form.append(err, f, b);
+    var out = el('button', 'link', 'Salir'); out.type = 'button';
+    out.addEventListener('click', salir);
+    app.append(form, out);
+    i.focus();
+
+    function mostrar(m) { err.textContent = m; err.style.display = 'block'; }
+
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var codigo = i.value.replace(/\s+/g, '');
+      if (!/^[0-9]{6}$/.test(codigo)) { mostrar('El código tiene 6 dígitos.'); return; }
+      b.disabled = true; err.style.display = 'none';
+      // Un reto nuevo por intento: si el código anterior falló, no se reutiliza su reto.
+      api('/auth/v1/factors/' + factorId + '/challenge', { method: 'POST', body: '{}' })
+        .then(jsonDe)
+        .then(function (r) {
+          if (!r.ok || !r.j.id) throw new Error('No se pudo pedir el código. Vuelve a intentarlo.');
+          return api('/auth/v1/factors/' + factorId + '/verify', {
+            method: 'POST', body: JSON.stringify({ challenge_id: r.j.id, code: codigo })
+          });
+        })
+        .then(jsonDe)
+        .then(function (r) {
+          if (!r.ok || !r.j.access_token) throw new Error('Código incorrecto o caducado. Prueba con el que muestre ahora la app.');
+          token = r.j.access_token; // sesión aal2: a partir de aquí la RLS deja leer
+          return rpcBool('es_admin');
+        })
+        .then(function (esAdmin) {
+          if (!esAdmin) { token = null; throw new Error('Esta cuenta no tiene acceso al panel.'); }
+          shell();
+        })
+        .catch(function (e) { mostrar(e.message || 'No se pudo verificar.'); b.disabled = false; i.value = ''; i.focus(); });
+    });
+  }
+
   function login(mensaje) {
     clear();
     app.appendChild(el('div', 'eyebrow', 'Uso interno'));
@@ -83,12 +185,12 @@
         .then(function (r) {
           if (!r.ok || !r.j.access_token) throw new Error('Email o contraseña incorrectos.');
           token = r.j.access_token; i2.value = '';
-          return api('/rest/v1/rpc/es_admin', { method: 'POST', body: '{}' });
+          // Solo comprueba que el email está en panel_admins; los datos siguen cerrados hasta el segundo factor.
+          return rpcBool('es_admin_email');
         })
-        .then(function (r) { return r.ok ? r.json() : false; })
-        .then(function (esAdmin) {
-          if (esAdmin !== true) { token = null; throw new Error('Esta cuenta no tiene acceso al panel.'); }
-          shell();
+        .then(function (autorizado) {
+          if (!autorizado) { token = null; throw new Error('Esta cuenta no tiene acceso al panel.'); }
+          return pasoMfa();
         })
         .catch(function (e) { mostrar(e.message || 'No se pudo entrar.'); b.disabled = false; });
     });

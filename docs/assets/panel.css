@@ -64,3 +64,6 @@ input[type=number]:focus{outline:none;border-color:var(--adv);box-shadow:0 0 0 3
 .btn-icono{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border-radius:8px;cursor:pointer;flex-shrink:0;}
 .btn-icono.peligro{background:#fff;color:var(--err);border:1px solid var(--err);}
 .btn-icono.peligro:hover{background:var(--err-bg);}
+.mfa-qr{display:flex;justify-content:center;margin:12px 0 16px;}
+.mfa-qr img{width:200px;height:200px;background:#fff;padding:8px;border:1px solid var(--border);border-radius:10px;}
+.mfa-clave{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:var(--bg);padding:2px 6px;border-radius:6px;word-break:break-all;}
