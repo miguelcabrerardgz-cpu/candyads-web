@@ -538,13 +538,14 @@
       });
 
       var guardar = el('button', 'btn', 'Guardar ficha'); guardar.type = 'submit';
+      var msg = el('p', 'p-note');
       form.append(err, nombre.wrap, emailDestino.wrap, fLimite, razon.wrap, cif.wrap, emailPriv.wrap,
-        sector.wrap, zona.wrap, color.wrap, colorSec.wrap, fCampos, guardar);
+        sector.wrap, zona.wrap, color.wrap, colorSec.wrap, fCampos, guardar, msg);
       sec.appendChild(form);
 
       form.addEventListener('submit', function (ev) {
         ev.preventDefault();
-        err.style.display = 'none';
+        err.style.display = 'none'; msg.textContent = '';
         var colorHex = valOrNull(color.input), colorSecHex = valOrNull(colorSec.input);
         if (colorHex && !/^#[0-9a-fA-F]{6}$/.test(colorHex)) {
           err.textContent = 'El color principal debe tener el formato #RRGGBB.'; err.style.display = 'block'; return;
@@ -565,15 +566,32 @@
           tema_color_secundario: colorSecHex,
           campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
         };
+        // email_destino decide a quién llegan los datos personales de cada lead: una errata los manda a otra
+        // persona. Por eso, si cambia, se pide confirmación mostrando el antes y el después.
+        var cambiaDestino = payload.email_destino.toLowerCase() !== String(a.email_destino || '').toLowerCase();
+        if (cambiaDestino && !confirm(
+          '¿Cambiar el email donde llegan los leads de «' + (a.nombre_mostrado || a.slug) + '»?\n\n' +
+          'Antes: ' + (a.email_destino || '(ninguno)') + '\n' +
+          'Ahora: ' + payload.email_destino + '\n\n' +
+          'Desde el próximo lead, los datos de quien rellene el formulario llegarán a esta dirección. ' +
+          'Revisa que está bien escrita. El cambio queda registrado (quién y cuándo).')) return;
         guardar.disabled = true;
-        ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), { method: 'PATCH', body: JSON.stringify(payload) })
+        // return=representation: si la base de datos no actualiza ninguna fila (p. ej. la RLS la bloquea),
+        // PostgREST responde igualmente 2xx; así se detecta y no se muestra "Guardado" sin haberlo guardado.
+        ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
+          method: 'PATCH', body: JSON.stringify(payload), headers: { Prefer: 'return=representation' }
+        })
           .then(function (r) {
             if (r.status === 401) { ctx.sesionCaducada(); return; }
             if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) {
               throw new Error((b && b.message) || 'No se pudo guardar la ficha.');
             });
-            Object.assign(a, payload);
-            guardar.disabled = false;
+            return r.json().then(function (filas) {
+              if (!Array.isArray(filas) || filas.length !== 1) throw new Error('No se guardó ningún cambio. Recarga el panel y vuelve a intentarlo.');
+              Object.assign(a, payload);
+              guardar.disabled = false;
+              msg.textContent = cambiaDestino ? 'Guardado. Los próximos leads llegarán a ' + payload.email_destino + '.' : 'Guardado.';
+            });
           })
           .catch(function (e) { err.textContent = e.message; err.style.display = 'block'; guardar.disabled = false; });
       });
