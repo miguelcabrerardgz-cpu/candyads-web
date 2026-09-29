@@ -73,6 +73,11 @@ button.btn.mini{width:auto;padding:7px 14px;font-size:13px;border-radius:9px;}
 .enlace.compacto{flex-wrap:nowrap;gap:8px;}
 .enlace.compacto a{font-size:13px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 table.p th.izq,table.p td.izq{text-align:left;}
+.color-fila{display:flex;gap:10px;align-items:center;}
+.color-fila input[type=color]{width:52px;height:48px;padding:3px;border:1px solid #CBD0E2;border-radius:11px;background:#fff;cursor:pointer;flex-shrink:0;}
+.color-fila input[type=text]{flex:1;min-width:0;}
+.color-ok{color:var(--ok);}
+.color-mal,.color-revisar{color:#B45309;}
 .mfa-qr{display:flex;justify-content:center;margin:12px 0 16px;}
 .mfa-qr svg{width:220px;height:220px;display:block;background:#fff;border:1px solid var(--border);border-radius:10px;}
 .mfa-pasos{margin:0 0 12px;padding-left:22px;font-size:15px;line-height:1.5;color:var(--ink);}

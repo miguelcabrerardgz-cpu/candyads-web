@@ -30,6 +30,20 @@
   // después. Mismo prefijo que BASE en qr.js.
   var BASE_LEAD = 'https://candyads.es/lead/';
 
+  // Morado oficial de Candy Ads: color del formulario público cuando la campaña no tiene uno propio legible.
+  // lead.js aplica la misma regla (mismo valor y mismo umbral) al pintar /lead/<slug>.
+  var COLOR_MARCA = '#8B7BC0';
+  var CONTRASTE_MIN = 3;
+
+  // Contraste WCAG frente a blanco (el texto de los botones del formulario es blanco).
+  function contrasteBlanco(hex) {
+    var l = [1, 3, 5].map(function (i) {
+      var v = parseInt(hex.substr(i, 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 1.05 / (0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] + 0.05);
+  }
+
   var hora = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', second: '2-digit' });
   var diaMadrid = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
   var ETQ = { enviado: 'Enviado', error: 'Error de envío', pendiente: 'Sin confirmar' };
@@ -134,6 +148,34 @@
     }
 
     function valOrNull(input) { var v = input.value.trim(); return v === '' ? null : v; }
+
+    // Color: selector visual + hex editable, sincronizados. conContraste: además, contraste con blanco en vivo.
+    function campoColor(etiqueta, valor, conContraste) {
+      var f = el('div', 'field');
+      f.appendChild(el('label', 'lbl', etiqueta));
+      var fila = el('div', 'color-fila');
+      var picker = el('input'); picker.type = 'color';
+      var hex = el('input'); hex.type = 'text'; hex.placeholder = '#RRGGBB'; hex.value = valor || '';
+      var info = el('p', 'p-note');
+      function sync() {
+        var v = hex.value.trim(), ok = /^#[0-9a-fA-F]{6}$/.test(v);
+        if (ok) picker.value = v.toLowerCase();
+        if (!conContraste) return;
+        info.className = 'p-note';
+        if (!v) { info.textContent = 'Sin color: el formulario usa el morado de Candy Ads.'; return; }
+        if (!ok) { info.textContent = 'Formato #RRGGBB.'; return; }
+        var c = contrasteBlanco(v), bien = c >= CONTRASTE_MIN;
+        info.className = 'p-note ' + (bien ? 'color-ok' : 'color-mal');
+        info.textContent = 'Contraste con el texto blanco: ' + c.toFixed(1).replace('.', ',') + ':1 ' +
+          (bien ? '✓' : '✗ insuficiente (mínimo 3:1): el formulario usará el morado de Candy Ads.');
+      }
+      picker.addEventListener('input', function () { hex.value = picker.value.toUpperCase(); sync(); });
+      hex.addEventListener('input', sync);
+      fila.append(picker, hex);
+      f.append(fila, info);
+      sync();
+      return { wrap: f, input: hex };
+    }
 
     // Enlace del QR (seleccionable y clicable) + botón de copiar. compacto: versión corta del listado.
     function enlaceQr(slug, compacto) {
@@ -582,9 +624,14 @@
           // a la espera de "Guardar ficha", quedan sin aplicar hasta que alguien pulse ese botón por
           // separado — y eso es fácil de dar por hecho ya guardado, como pasó la primera vez con esto.
           var payload = { tema_logo: url };
+          var legible = true;
           if (colores) {
-            payload.tema_color = colores.color;
+            // Si el color del logo no deja leer el texto blanco de los botones, se guarda el morado de marca
+            // y la campaña queda marcada para revisar el color a mano.
+            legible = contrasteBlanco(colores.color) >= CONTRASTE_MIN;
+            payload.tema_color = legible ? colores.color : COLOR_MARCA;
             payload.tema_color_secundario = colores.colorSecundario || null;
+            if (Object.prototype.hasOwnProperty.call(a, 'tema_color_origen')) payload.tema_color_origen = legible ? 'auto' : 'revisar';
           }
           return ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
             method: 'PATCH', body: JSON.stringify(payload)
@@ -594,11 +641,14 @@
             Object.assign(a, payload);
             pintarPreview();
             inputLogo.value = '';
-            if (iColor) iColor.value = a.tema_color || '';
-            if (iColorSec) iColorSec.value = a.tema_color_secundario || '';
-            notaColores.textContent = colores
-              ? 'Logo y colores del tema guardados.'
-              : 'Logo guardado. No se pudieron detectar colores automáticamente; puedes escribirlos abajo y pulsar «Guardar ficha».';
+            // 'input' para que el selector de color y el aviso de contraste se actualicen también.
+            if (iColor) { iColor.value = a.tema_color || ''; iColor.dispatchEvent(new Event('input')); }
+            if (iColorSec) { iColorSec.value = a.tema_color_secundario || ''; iColorSec.dispatchEvent(new Event('input')); }
+            notaColores.textContent = !colores
+              ? 'Logo guardado. No se pudieron detectar colores automáticamente; puedes elegirlos abajo y pulsar «Guardar ficha».'
+              : legible ? 'Logo y colores del tema guardados.'
+              : 'Logo guardado. El color del logo (' + colores.color + ') no contrasta lo bastante con el texto blanco ' +
+                '(mínimo 3:1): se usa el morado de Candy Ads hasta que elijas otro abajo.';
             notaColores.style.display = 'block';
           });
         }).catch(function (e) { errLogo.textContent = e.message; errLogo.style.display = 'block'; })
@@ -635,8 +685,25 @@
       var emailPriv = campoTexto('Email de privacidad', 'email'); emailPriv.input.value = a.email_privacidad || '';
       var sector = campoTexto('Sector', 'text'); sector.input.value = a.sector || '';
       var zona = campoTexto('Zona', 'text'); zona.input.value = a.zona || '';
-      var color = campoTexto('Color principal del tema (hex)', 'text'); color.input.value = a.tema_color || ''; color.input.placeholder = '#1C4C98';
-      var colorSec = campoTexto('Color secundario del tema (hex)', 'text'); colorSec.input.value = a.tema_color_secundario || '';
+      var color = campoColor('Color del formulario público', a.tema_color, true);
+      var colorSec = campoColor('Color secundario', a.tema_color_secundario, false);
+      // Origen del color (migración 20260929010000_color_origen.sql). Solo si la columna ya existe.
+      var conOrigen = Object.prototype.hasOwnProperty.call(a, 'tema_color_origen');
+      var origen = el('p', 'p-note');
+      function pintarOrigen() {
+        var o = a.tema_color_origen;
+        origen.className = 'p-note' + (o === 'revisar' ? ' color-revisar' : '');
+        origen.textContent = o === 'auto' ? 'Detectado automáticamente del logo.'
+          : o === 'manual' ? 'Elegido a mano.'
+          : o === 'revisar' ? '⚠ Pendiente de revisión manual: el color del logo no tenía contraste suficiente y se está usando el morado de Candy Ads.'
+          : '';
+      }
+      if (conOrigen) {
+        pintarOrigen();
+        color.wrap.appendChild(origen);
+        // Al subir un logo, bloqueLogo actualiza a.tema_color_origen y lanza 'input' en este campo.
+        color.input.addEventListener('input', pintarOrigen);
+      }
 
       // El logo se sube aparte (bloqueLogo), pero al detectar sus colores rellena estos mismos campos
       // para revisarlos antes de guardar la ficha.
@@ -692,6 +759,10 @@
           campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
         };
         if (iEscala) payload.logo_landing_escala = parseInt(iEscala.value, 10);
+        if (conOrigen) {
+          if (!colorHex) payload.tema_color_origen = null;
+          else if (colorHex.toLowerCase() !== String(a.tema_color || '').toLowerCase()) payload.tema_color_origen = 'manual';
+        }
         // email_destino decide a quién llegan los datos personales de cada lead: una errata los manda a otra
         // persona. Por eso, si cambia, se pide confirmación mostrando el antes y el después.
         var cambiaDestino = payload.email_destino.toLowerCase() !== String(a.email_destino || '').toLowerCase();
@@ -715,6 +786,7 @@
             return r.json().then(function (filas) {
               if (!Array.isArray(filas) || filas.length !== 1) throw new Error('No se guardó ningún cambio. Recarga el panel y vuelve a intentarlo.');
               Object.assign(a, payload);
+              if (conOrigen) pintarOrigen();
               guardar.disabled = false;
               msg.textContent = cambiaDestino ? 'Guardado. Los próximos leads llegarán a ' + payload.email_destino + '.' : 'Guardado.';
             });

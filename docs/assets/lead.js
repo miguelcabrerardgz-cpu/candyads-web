@@ -66,16 +66,26 @@
     return [1, 3, 5].map(function (i) { return parseInt(hex.substr(i, 2), 16); });
   }
 
+  // Morado oficial de Candy Ads: color del formulario si la campaña no tiene uno propio o no deja leer el texto
+  // blanco de los botones (contraste WCAG < 3:1). El panel aplica la misma regla y lo avisa en la ficha.
+  var COLOR_MARCA = '#8B7BC0';
+
+  function contrasteBlanco(hex) {
+    var l = rgb(hex).map(function (v) {
+      v = v / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 1.05 / (0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] + 0.05);
+  }
+
   function aplicarTema(cfg) {
-    var t = cfg.tema;
-    if (!t) return;
+    var t = cfg.tema || {};
     var root = document.documentElement.style;
-    if (HEX_RE.test(t.color || '')) {
-      var c = rgb(t.color);
-      root.setProperty('--adv', t.color);
-      root.setProperty('--adv-rgb', c.join(','));
-      root.setProperty('--adv-dark', 'rgb(' + c.map(function (v) { return Math.round(v * 0.78); }).join(',') + ')');
-    }
+    var color = HEX_RE.test(t.color || '') && contrasteBlanco(t.color) >= 3 ? t.color : COLOR_MARCA;
+    var c = rgb(color);
+    root.setProperty('--adv', color);
+    root.setProperty('--adv-rgb', c.join(','));
+    root.setProperty('--adv-dark', 'rgb(' + c.map(function (v) { return Math.round(v * 0.78); }).join(',') + ')');
     if (HEX_RE.test(t.color_secundario || '')) root.setProperty('--adv-2', t.color_secundario);
   }
 
