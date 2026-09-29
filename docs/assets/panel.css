@@ -85,3 +85,4 @@ table.p th.izq,table.p td.izq{text-align:left;}
 .p-note + .mfa-pasos{margin-top:14px;}
 .mfa-aviso{margin:0 0 18px;}
 .mfa-clave{font-family:ui-monospace,Consolas,monospace;font-size:13px;background:var(--bg);padding:2px 6px;border-radius:6px;word-break:break-all;}
+.historial-email{margin-top:24px;}

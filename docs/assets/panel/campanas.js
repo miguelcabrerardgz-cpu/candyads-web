@@ -149,6 +149,46 @@
 
     function valOrNull(input) { var v = input.value.trim(); return v === '' ? null : v; }
 
+    // Historial del email de destino (campanas_cambios, lo rellena solo un trigger en Supabase: alta, cambios
+    // y baja, con quién y cuándo). Solo lectura: el panel no puede escribir en esa tabla.
+    var fechaHora = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', dateStyle: 'short', timeStyle: 'short' });
+    function historialEmail(a) {
+      var w = el('div', 'historial-email');
+      w.appendChild(el('p', 'lbl', 'Historial del email de destino'));
+      var cuerpo = el('div');
+      w.appendChild(cuerpo);
+      function cargar() {
+        ctx.clear(cuerpo);
+        ctx.api('/rest/v1/campanas_cambios?select=campo,valor_anterior,valor_nuevo,admin_email,creado_at&anunciante_slug=eq.' +
+            encodeURIComponent(a.slug) + '&order=creado_at.desc&limit=20')
+          .then(function (r) {
+            if (r.status === 401) { ctx.sesionCaducada(); return null; }
+            if (!r.ok) throw new Error('No se pudo leer el historial.');
+            return r.json();
+          })
+          .then(function (filas) {
+            if (!filas) return;
+            if (!filas.length) { cuerpo.appendChild(el('p', 'p-note', 'Sin cambios registrados.')); return; }
+            var t = el('table', 'p'), cab = el('tr');
+            ['Cuándo', 'Qué', 'Quién'].forEach(function (h) { cab.appendChild(el('th', 'izq', h)); });
+            t.appendChild(cab);
+            filas.forEach(function (f) {
+              var que = f.campo === 'alta' ? 'Alta con destino ' + f.valor_nuevo
+                : f.campo === 'baja' ? 'Baja (destino ' + f.valor_anterior + ')'
+                : f.valor_anterior + ' → ' + f.valor_nuevo;
+              var tr = el('tr');
+              [fechaHora.format(new Date(f.creado_at)), que, f.admin_email].forEach(function (v) { tr.appendChild(el('td', 'izq', v)); });
+              t.appendChild(tr);
+            });
+            var s = el('div', 'tbl-scroll'); s.appendChild(t);
+            cuerpo.appendChild(s);
+          })
+          .catch(function (e) { cuerpo.appendChild(el('div', 'p-err', e.message)); });
+      }
+      cargar();
+      return { wrap: w, recargar: cargar };
+    }
+
     // Color: selector visual + hex editable, sincronizados. conContraste: además, contraste con blanco en vivo.
     function campoColor(etiqueta, valor, conContraste) {
       var f = el('div', 'field');
@@ -734,6 +774,8 @@
       form.append(err, nombre.wrap, emailDestino.wrap, fLimite, razon.wrap, cif.wrap, emailPriv.wrap,
         sector.wrap, zona.wrap, color.wrap, colorSec.wrap, fCampos, guardar, msg);
       sec.appendChild(form);
+      var historial = historialEmail(a);
+      sec.appendChild(historial.wrap);
 
       form.addEventListener('submit', function (ev) {
         ev.preventDefault();
@@ -787,6 +829,7 @@
               if (!Array.isArray(filas) || filas.length !== 1) throw new Error('No se guardó ningún cambio. Recarga el panel y vuelve a intentarlo.');
               Object.assign(a, payload);
               if (conOrigen) pintarOrigen();
+              if (cambiaDestino) historial.recargar();
               guardar.disabled = false;
               msg.textContent = cambiaDestino ? 'Guardado. Los próximos leads llegarán a ' + payload.email_destino + '.' : 'Guardado.';
             });
