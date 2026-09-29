@@ -99,3 +99,7 @@ label.check.ec-obl{margin:0;font-size:13px;white-space:nowrap;}
 .ec-nuevo-fila select{width:auto;flex-shrink:0;}
 .ec-nuevo > input{margin-bottom:8px;}
 .ec-vista{border:1px dashed #CBD0E2;border-radius:12px;padding:14px;background:#fff;}
+.badge-borrador{background:rgba(29,78,216,.10);color:#1D4ED8;}
+.estado-fila{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+button.btn.sec.peligro{color:var(--err);border-color:var(--err);}
+button.btn.sec.peligro:hover{background:var(--err-bg);}

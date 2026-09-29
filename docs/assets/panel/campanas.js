@@ -4,6 +4,7 @@
   'use strict';
 
   var ESTADOS = {
+    borrador: { etiqueta: 'Borrador', clase: 'badge-borrador' },
     activa: { etiqueta: 'Activa', clase: 'badge-activa' },
     pausada: { etiqueta: 'Pausada', clase: 'badge-pausada' },
     finalizada: { etiqueta: 'Finalizada', clase: 'badge-finalizada' }
@@ -403,7 +404,8 @@
         var payload = {
           slug: slug,
           nombre_mostrado: iNombre.value.trim(),
-          estado: 'activa',
+          // Nace en borrador: el QR no muestra el formulario hasta pulsar «Lanzar campaña» en su ficha.
+          estado: 'borrador',
           email_destino: iEmailDestino.value.trim(),
           limite_diario: parseInt(iLimite.value, 10) || 100,
           razon_social: valOrNull(razon.input),
@@ -436,7 +438,7 @@
       var c = el('div', 'p-confirmacion');
       cont.appendChild(c);
       c.appendChild(el('h1', 'p-h1', 'Campaña creada'));
-      c.appendChild(el('p', 'lead', '«' + nombre + '» ya está lista. Genera su QR o vuelve al listado.'));
+      c.appendChild(el('p', 'lead', '«' + nombre + '» está creada como borrador: su QR no mostrará el formulario hasta que pulses «Lanzar campaña» en su ficha. Ya puedes generar su QR.'));
       var qrBtn = el('button', 'btn', 'Generar su QR'); qrBtn.type = 'button';
       qrBtn.addEventListener('click', function () { ctx.irA('qr', slug); });
       var volver = el('button', 'btn sec', 'Volver a la lista'); volver.type = 'button';
@@ -544,41 +546,72 @@
     }
 
     // 3.2 — Estado: separado de la ficha porque es la acción más urgente (dar de baja un QR ya impreso
-    // no debería esperar a rellenar el resto del formulario).
+    // no debería esperar a rellenar el resto del formulario). Solo se ofrecen los pasos permitidos:
+    // borrador → activa; activa ⇄ pausada; activa/pausada → finalizada, sin vuelta atrás desde el panel.
+    // El QR impreso apunta siempre a la misma dirección: ningún cambio de estado obliga a reimprimirlo.
+    var TRANSICIONES = {
+      borrador: [['activa', 'Lanzar campaña', 'btn']],
+      activa: [['pausada', 'Pausar', 'btn sec'], ['finalizada', 'Finalizar', 'btn sec peligro']],
+      pausada: [['activa', 'Reanudar', 'btn'], ['finalizada', 'Finalizar', 'btn sec peligro']],
+      finalizada: []
+    };
+    var EXPLICA = {
+      borrador: 'Borrador: el QR todavía no muestra el formulario ni se aceptan envíos. Lánzala cuando esté lista.',
+      activa: 'Activa: el QR muestra el formulario y los contactos llegan al anunciante.',
+      pausada: 'Pausada: el QR muestra un aviso de no disponible y no se aceptan envíos. Se puede reanudar.',
+      finalizada: 'Finalizada: el QR muestra un aviso de no disponible. No se puede reactivar desde el panel.'
+    };
+
     function bloqueEstado(a) {
       var sec = el('section', 'p-bloque');
       sec.appendChild(el('h2', 'p', 'Estado'));
-      var fila = el('div', 'field');
-      var select = el('select');
-      Object.keys(ESTADOS).forEach(function (k) {
-        var op = el('option', null, ESTADOS[k].etiqueta); op.value = k;
-        select.appendChild(op);
-      });
-      select.value = a.estado;
-      fila.appendChild(select);
-      var guardar = el('button', 'btn', 'Guardar estado'); guardar.type = 'button';
+      var cuerpo = el('div');
+      sec.appendChild(cuerpo);
       var msg = el('p', 'p-note');
-      var aviso = el('p', 'p-note',
-        'Mientras no esté "Activa", /lead/' + a.slug + ' mostrará un aviso de no disponible en vez del formulario.');
 
-      guardar.addEventListener('click', function () {
-        guardar.disabled = true;
-        msg.className = 'p-note'; msg.textContent = '';
-        ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
-          method: 'PATCH', body: JSON.stringify({ estado: select.value })
-        }).then(function (r) {
-          if (r.status === 401) { ctx.sesionCaducada(); return; }
-          if (!r.ok) throw new Error('No se pudo guardar el estado.');
-          a.estado = select.value;
-          msg.textContent = 'Guardado.';
-          guardar.disabled = false;
-        }).catch(function (e) {
-          msg.className = 'p-err'; msg.textContent = e.message;
-          guardar.disabled = false;
+      function pintar() {
+        ctx.clear(cuerpo);
+        var info = ESTADOS[a.estado] || { etiqueta: a.estado, clase: '' };
+        var fila = el('div', 'estado-fila');
+        fila.appendChild(el('span', 'badge ' + info.clase, info.etiqueta));
+        (TRANSICIONES[a.estado] || []).forEach(function (t) {
+          var b = el('button', t[2] + ' mini', t[1]); b.type = 'button';
+          b.addEventListener('click', function () { cambiar(t[0]); });
+          fila.appendChild(b);
         });
-      });
+        cuerpo.append(fila, el('p', 'p-note', EXPLICA[a.estado] || ''), msg);
+      }
 
-      sec.append(fila, guardar, msg, aviso);
+      function cambiar(nuevo) {
+        var nombre = a.nombre_mostrado || a.slug;
+        if (nuevo === 'finalizada' && !confirm('¿Finalizar la campaña «' + nombre + '»?\n\nEl QR dejará de mostrar el ' +
+          'formulario y no se podrá reactivar desde el panel.')) return;
+        // La revisión legal pide identificar al anunciante antes de que el QR reciba contactos reales.
+        if (nuevo === 'activa' && a.estado === 'borrador' && !(a.razon_social && a.cif && a.email_privacidad) &&
+          !confirm('A «' + nombre + '» le falta la razón social, el CIF o el email de privacidad (en la ficha, más abajo).\n\n' +
+            'Hacen falta antes de que el QR reciba contactos reales. ¿Lanzarla igualmente?')) return;
+        Array.from(cuerpo.querySelectorAll('button')).forEach(function (b) { b.disabled = true; });
+        msg.className = 'p-note'; msg.textContent = '';
+        // return=representation: un PATCH que la base de datos no aplica responde igualmente 2xx.
+        ctx.api('/rest/v1/anunciantes_destino?slug=eq.' + encodeURIComponent(a.slug), {
+          method: 'PATCH', body: JSON.stringify({ estado: nuevo }), headers: { Prefer: 'return=representation' }
+        }).then(function (r) {
+          if (r.status === 401) { ctx.sesionCaducada(); return null; }
+          if (!r.ok) throw new Error('No se pudo cambiar el estado.');
+          return r.json();
+        }).then(function (filas) {
+          if (filas === null) return;
+          if (!Array.isArray(filas) || filas.length !== 1) throw new Error('No se guardó el cambio. Recarga el panel y vuelve a intentarlo.');
+          a.estado = nuevo;
+          pintar();
+          msg.textContent = 'Guardado.';
+        }).catch(function (e) {
+          pintar();
+          msg.className = 'p-err'; msg.textContent = e.message;
+        });
+      }
+
+      pintar();
       return sec;
     }
 
