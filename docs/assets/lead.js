@@ -7,18 +7,8 @@
   var MIN_MS = 2500;
   var SLUG_RE = /^[a-z0-9][a-z0-9-]{0,60}$/;
 
-  var CATALOGO = {
-    nombre: { label: 'Nombre', type: 'text', required: true, autocomplete: 'name', max: 80,
-      error: 'Escribe tu nombre' },
-    telefono: { label: 'Teléfono', type: 'tel', required: true, autocomplete: 'tel', max: 20,
-      error: 'Escribe un teléfono válido' },
-    email: { label: 'Email', type: 'email', required: false, autocomplete: 'email', max: 120,
-      error: 'Escribe un email válido' },
-    interes_venta_alquiler: { label: '¿Qué necesitas?', type: 'select', required: true,
-      options: ['Quiero vender mi vivienda', 'Quiero alquilar mi vivienda', 'Busco comprar', 'Busco alquilar', 'Otra consulta'],
-      error: 'Elige una opción' },
-    mensaje: { label: 'Mensaje', type: 'textarea', required: false, max: 500 }
-  };
+  // Los campos del formulario (definición, pintado y comprobación) viven en formulario.js, compartido con
+  // la vista previa del panel.
 
   function $(id) { return document.getElementById(id); }
 
@@ -50,7 +40,7 @@
         return r.json();
       })
       .then(function (c) {
-        if (!c || c.estado !== 'activa' || typeof c.nombre_mostrado !== 'string' || !Array.isArray(c.campos)) {
+        if (!c || c.estado !== 'activa' || typeof c.nombre_mostrado !== 'string' || (!Array.isArray(c.campos) && !Array.isArray(c.formulario))) {
           throw new Error('inactivo');
         }
         return c;
@@ -129,17 +119,6 @@
     }).catch(function () { return ''; });
   }
 
-  function validar(def, v) {
-    if (!v) return def.required ? (def.error || 'Campo obligatorio') : '';
-    if (def.type === 'tel') {
-      var d = v.replace(/\D/g, '');
-      if (!/^\+?[0-9 ()\-]+$/.test(v) || d.length < 9 || d.length > 15) return def.error;
-    }
-    if (def.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return def.error;
-    if (def.type === 'select' && def.options.indexOf(v) === -1) return def.error;
-    return '';
-  }
-
   function estadoVacio(card, titulo, texto) {
     card.textContent = '';
     card.appendChild(el('p', { 'class': 'eyebrow' }, 'Candy Ads'));
@@ -147,29 +126,6 @@
     card.appendChild(el('p', { 'class': 'lead' }, texto));
     var a = el('a', { href: '/' }, 'Ir a candyads.es');
     card.appendChild(a);
-  }
-
-  function buildCampo(id, def) {
-    var wrap = el('div', { 'class': 'field', 'data-id': id });
-    var lbl = el('label', { 'class': 'lbl', 'for': 'f-' + id }, def.label);
-    if (!def.required) lbl.appendChild(el('span', { 'class': 'opt' }, ' (opcional)'));
-    var ctl;
-    if (def.type === 'select') {
-      ctl = el('select', { id: 'f-' + id, name: id });
-      ctl.appendChild(el('option', { value: '' }, 'Selecciona…'));
-      def.options.forEach(function (o) { ctl.appendChild(el('option', { value: o }, o)); });
-    } else if (def.type === 'textarea') {
-      ctl = el('textarea', { id: 'f-' + id, name: id, maxlength: String(def.max || 500) });
-    } else {
-      ctl = el('input', { id: 'f-' + id, name: id, type: def.type, maxlength: String(def.max || 120) });
-      if (def.autocomplete) ctl.setAttribute('autocomplete', def.autocomplete);
-      if (def.type === 'tel') ctl.setAttribute('inputmode', 'tel');
-    }
-    ctl.setAttribute('aria-describedby', 'err-' + id);
-    wrap.appendChild(lbl);
-    wrap.appendChild(ctl);
-    wrap.appendChild(el('p', { 'class': 'msg-err', id: 'err-' + id }, def.error || 'Campo obligatorio'));
-    return wrap;
   }
 
   function gracias(slug, demo) {
@@ -208,8 +164,9 @@
     }
 
     var form = el('form', { id: 'lead-form', novalidate: 'novalidate', autocomplete: 'on' });
-    var campos = cfg.campos.filter(function (id) { return CATALOGO[id]; });
-    campos.forEach(function (id) { form.appendChild(buildCampo(id, CATALOGO[id])); });
+    var CF = window.CandyFormulario;
+    var defs = CF.normalizar(cfg);
+    CF.pintar(form, defs);
 
     var hp = el('div', { 'class': 'hp', 'aria-hidden': 'true' });
     hp.appendChild(el('label', { 'for': 'f-web_site' }, 'No rellenar este campo'));
@@ -284,16 +241,9 @@
       var datos = {};
       var primero = null;
 
-      campos.forEach(function (id) {
-        var def = CATALOGO[id];
-        var ctl = form.elements[id];
-        var v = (ctl.value || '').trim();
-        var err = validar(def, v);
-        var wrap = ctl.closest('.field');
-        wrap.classList.toggle('invalid', !!err);
-        if (err && !primero) primero = ctl;
-        datos[id] = v;
-      });
+      var lectura = CF.leer(form, defs);
+      datos = lectura.datos;
+      primero = lectura.primero;
 
       var chk = form.elements.consent;
       cf.classList.toggle('invalid', !chk.checked);

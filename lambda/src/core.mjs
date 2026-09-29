@@ -1,4 +1,4 @@
-import { validarDatos } from './campos.mjs';
+import { normalizarFormulario, validarFormulario } from './campos.mjs';
 import { construirCorreo, construirCorreoRecordatorio } from './email.mjs';
 import { validarContacto, construirCorreoContacto } from './contacto.mjs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -76,8 +76,9 @@ export function createHandler(deps) {
     let val = null;
     try {
       const c = await rpc('config_publico_de', { p_slug: slug });
-      if (c && c.estado === 'activa' && typeof c.nombre_mostrado === 'string' && Array.isArray(c.campos)) {
-        val = { nombre: c.nombre_mostrado, campos: c.campos.filter((x) => typeof x === 'string') };
+      const formulario = c ? normalizarFormulario(c) : [];
+      if (c && c.estado === 'activa' && typeof c.nombre_mostrado === 'string' && formulario.length) {
+        val = { nombre: c.nombre_mostrado, formulario };
       }
     } catch { /* se trata como no disponible */ }
     cfgCache.set(slug, { val, exp: now() + (val ? CFG_TTL : CFG_TTL_NEG) });
@@ -103,6 +104,8 @@ export function createHandler(deps) {
       estado: c.estado,
       nombre_mostrado: c.nombre_mostrado,
       campos: c.campos,
+      // Definición completa de los campos (campos_formulario, o la lista antigua traducida): la pinta formulario.js.
+      formulario: normalizarFormulario(c),
       tema: { color: c.tema_color, color_secundario: c.tema_color_secundario, logo: c.tema_logo, logo_escala: c.logo_landing_escala },
       razon_social: c.razon_social,
       nif_cif: c.cif,
@@ -170,7 +173,7 @@ export function createHandler(deps) {
     const cfg = await cargarConfig(slug);
     if (!cfg) return fin(404, 'no_disponible', slug);
 
-    const v = validarDatos(cfg.campos, b.datos);
+    const v = validarFormulario(cfg.formulario, b.datos);
     if (!v.ok) return fin(400, 'datos_' + v.motivo.replace(/\s+/g, '_'), slug);
 
     const reto = await verificarAltcha(b.altcha);
@@ -187,7 +190,7 @@ export function createHandler(deps) {
       const reservado = await rpc('reservar_lead_ref', { p_slug: slug, p_ref: ref });
       if (reservado !== true) return fin(429, 'limite_diario', slug);
 
-      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase(), refCompleta: ref, sitio: env.SITE_URL });
+      const correo = construirCorreo({ nombreAnunciante: cfg.nombre, formulario: cfg.formulario, datos: v.datos, ahora: now(), referencia: ref.slice(0, 8).toUpperCase(), refCompleta: ref, sitio: env.SITE_URL });
       let envio;
       try {
         envio = await sendEmail({ from: env.SES_FROM, to: destino, replyTo: correo.replyTo, subject: correo.subject, text: correo.text, html: correo.html });

@@ -19,11 +19,15 @@ const AVISO = 'Este mensaje contiene datos personales que la persona interesada 
 // Devuelve el correo listo para enviar. No incluye datos personales en el asunto.
 // `refCompleta`, si se da, añade dos enlaces de un clic (sin login) para que el anunciante confirme si el
 // contacto terminó en venta. El enlace solo lleva la referencia aleatoria: no identifica a la persona.
-export function construirCorreo({ nombreAnunciante, datos, ahora, referencia, refCompleta, sitio }) {
+// `formulario` (lista de campos de la campaña, ver campos.mjs) da las etiquetas y el orden; sin él, el catálogo
+// antiguo. Cada valor se escapa al meterlo en el HTML (esc) — lo escribe la persona que rellena el formulario.
+export function construirCorreo({ nombreAnunciante, formulario, datos, ahora, referencia, refCompleta, sitio }) {
   const base = String(sitio || 'https://candyads.es').replace(/\/+$/, '');
-  const filas = Object.keys(datos)
-    .filter((id) => CATALOGO[id] && datos[id])
-    .map((id) => ({ etiqueta: CATALOGO[id].label, valor: datos[id] }));
+  const filas = Array.isArray(formulario)
+    ? formulario.filter((d) => datos[d.key]).map((d) => ({ etiqueta: d.label, valor: datos[d.key] }))
+    : Object.keys(datos)
+      .filter((id) => CATALOGO[id] && datos[id])
+      .map((id) => ({ etiqueta: CATALOGO[id].label, valor: datos[id] }));
 
   const confirmar = refCompleta
     ? {

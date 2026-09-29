@@ -140,3 +140,8 @@ header.logo-top{background:#fff;border-bottom:1px solid var(--border);padding:6p
 .logo-top .logo{display:inline-flex;align-items:center;text-decoration:none;}
 .logo-top .logo img{display:block;height:56px;width:auto;}
 .logo-top .logo img + img{height:40px;margin-left:-6px;}
+/* Campo de tipo casilla (formulario.js) */
+.check-fila{display:flex;gap:10px;align-items:flex-start;}
+.check-fila input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--adv);flex-shrink:0;}
+.check-fila label{font-size:15px;color:var(--ink);line-height:1.4;}
+.field.invalid .check-fila label{color:var(--err);}

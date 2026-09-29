@@ -248,11 +248,47 @@ test('validaciones básicas', async () => {
   assert.equal(codigo(await enviar(handle, { slug: 'no-existe' }, '5.5.5.4')), 'no_disponible');
   assert.equal(codigo(await enviar(handle, { datos: { ...datosOk(), telefono: '12' } }, '5.5.5.5')), 'datos_formato');
   assert.equal(codigo(await enviar(handle, { datos: { ...datosOk(), interes_venta_alquiler: 'otra cosa' } }, '5.5.5.6')), 'datos_opción_no_válida');
-  assert.equal(codigo(await enviar(handle, { datos: { ...datosOk(), extra: 'x' } }, '5.5.5.7')), 'datos_campo_no_permitido');
   assert.equal(codigo(await enviar(handle, { datos: { ...datosOk(), nombre: '' } }, '5.5.5.8')), 'datos_obligatorio');
   assert.equal(codigo(await enviar(handle, { datos: { ...datosOk(), mensaje: 'x'.repeat(501) } }, '5.5.5.9')), 'datos_demasiado_largo');
   assert.equal(estado.correos.length, 0);
   assert.equal(estado.contador, 0);
+});
+
+test('un campo que no está en el formulario de la campaña se descarta: no rechaza el envío ni llega al correo', async () => {
+  const { handle, estado } = entorno();
+  const r = await enviar(handle, { datos: { ...datosOk(), extra: 'CAMPO-INTRUSO' } }, '5.5.6.1');
+  assert.equal(r.statusCode, 200);
+  assert.equal(estado.correos.length, 1);
+  assert.ok(!estado.correos[0].text.includes('CAMPO-INTRUSO') && !estado.correos[0].html.includes('CAMPO-INTRUSO'));
+});
+
+test('campos_formulario: usa sus etiquetas y orden, exige los obligatorios y valida cada tipo', async () => {
+  const campos_formulario = [
+    { key: 'nombre', label: 'Nombre', tipo: 'text', obligatorio: true },
+    { key: 'cp', label: 'Código postal', tipo: 'text', obligatorio: false },
+    { key: 'visita', label: 'Fecha de visita', tipo: 'fecha', obligatorio: true },
+    { key: 'hab', label: 'Habitaciones', tipo: 'numero', obligatorio: false },
+    { key: 'zona', label: 'Zona', tipo: 'select', obligatorio: true, opciones: ['Centro', 'Triana'] },
+    { key: 'llamar', label: 'Prefiero que me llamen', tipo: 'checkbox', obligatorio: false },
+    { key: 'roto', label: 'Sin opciones', tipo: 'select', obligatorio: true, opciones: [] },
+    { key: 'Mal Clave', label: 'Clave inválida', tipo: 'text', obligatorio: true }
+  ];
+  const config = { estado: 'activa', nombre_mostrado: 'Inmo <b>X</b>', campos: [], campos_formulario };
+  const ok = { nombre: 'Ana <script>', cp: '41001', visita: '2026-10-05', hab: '3', zona: 'Triana', llamar: 'Sí' };
+  const { handle, estado } = entorno({ config });
+  assert.equal(codigo(await enviar(handle, { datos: { ...ok, visita: '' } }, '5.5.7.1')), 'datos_obligatorio');
+  assert.equal(codigo(await enviar(handle, { datos: { ...ok, visita: '05/10/2026' } }, '5.5.7.2')), 'datos_formato');
+  assert.equal(codigo(await enviar(handle, { datos: { ...ok, hab: 'tres' } }, '5.5.7.3')), 'datos_formato');
+  assert.equal(codigo(await enviar(handle, { datos: { ...ok, zona: 'Otra' } }, '5.5.7.4')), 'datos_opción_no_válida');
+  assert.equal(codigo(await enviar(handle, { datos: { ...ok, llamar: 'true' } }, '5.5.7.5')), 'datos_formato');
+  assert.equal(estado.correos.length, 0);
+  const r = await enviar(handle, { datos: ok }, '5.5.7.6');
+  assert.equal(r.statusCode, 200);
+  const c = estado.correos[0];
+  // Los campos mal definidos (select sin opciones, clave inválida) se ignoran en vez de bloquear la campaña.
+  assert.ok(c.text.indexOf('Nombre: ') < c.text.indexOf('Código postal: ') && c.text.indexOf('Código postal: ') < c.text.indexOf('Zona: '));
+  assert.ok(c.text.includes('Prefiero que me llamen: Sí'));
+  assert.ok(c.html.includes('Ana &lt;script&gt;') && !c.html.includes('Ana <script>'));
 });
 
 test('anunciante inactivo o sin destino: 404', async () => {
@@ -276,6 +312,11 @@ test('config pública: campaña activa devuelve ficha, sin activa solo el estado
   const c = JSON.parse(r.body);
   assert.deepEqual(c, {
     estado: 'activa', nombre_mostrado: 'La Casa Agency', campos: ['nombre', 'telefono'],
+    // Sin campos_formulario: la lista antigua traducida a la definición completa que pinta formulario.js.
+    formulario: [
+      { key: 'nombre', label: 'Nombre', tipo: 'text', obligatorio: true, max: 80 },
+      { key: 'telefono', label: 'Teléfono', tipo: 'tel', obligatorio: true }
+    ],
     tema: { color: '#1C4C98', color_secundario: '#909CCC', logo: '/assets/anunciantes/lacasa.png' },
     razon_social: 'La Casa Agency SL', nif_cif: 'B12345678', email_privacidad: 'privacidad@lacasa.example'
   });

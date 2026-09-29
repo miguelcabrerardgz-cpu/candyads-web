@@ -9,15 +9,7 @@
     finalizada: { etiqueta: 'Finalizada', clase: 'badge-finalizada' }
   };
 
-  // Mismos campos que conoce el formulario público (CATALOGO en lead.js). Si se añade uno nuevo allí,
-  // añadirlo también aquí para poder activarlo desde la ficha de campaña.
-  var CAMPOS_DISPONIBLES = [
-    ['nombre', 'Nombre'],
-    ['telefono', 'Teléfono'],
-    ['email', 'Email'],
-    ['interes_venta_alquiler', '¿Qué necesitas? (venta/alquiler)'],
-    ['mensaje', 'Mensaje']
-  ];
+  // Los campos del formulario público se definen y pintan con formulario.js (compartido con /lead/<slug>).
 
   var TIPOS_ARCHIVO = [
     'application/pdf', 'image/png', 'image/jpeg', 'image/webp',
@@ -189,6 +181,97 @@
       return { wrap: w, recargar: cargar };
     }
 
+    // Editor de los campos del formulario público, con vista previa en vivo pintada por formulario.js (el
+    // mismo que usa /lead/<slug>). Comunes: se quitan y se vuelven a añadir con un clic. Personalizados:
+    // etiqueta + tipo + obligatorio (+ opciones si es desplegable); su clave sale de la etiqueta, sin repetir.
+    function editorCampos(a) {
+      var CF = window.CandyFormulario;
+      var lista = CF.normalizar({ campos_formulario: a.campos_formulario, campos: a.campos });
+      var wrap = el('div', 'field editor-campos');
+      wrap.appendChild(el('label', 'lbl', 'Campos del formulario público'));
+      var filas = el('div', 'ec-lista');
+      var comunes = el('div', 'ec-comunes');
+      var errEd = el('div', 'p-err'); errEd.style.display = 'none';
+
+      var nuevo = el('div', 'ec-nuevo');
+      nuevo.appendChild(el('p', 'lbl', 'Añadir un campo personalizado'));
+      var iLabel = el('input'); iLabel.type = 'text'; iLabel.maxLength = 80; iLabel.placeholder = 'Pregunta, p. ej. ¿Cuántas habitaciones?';
+      var sTipo = el('select');
+      Object.keys(CF.TIPOS).forEach(function (k) { var o = el('option', null, CF.TIPOS[k]); o.value = k; sTipo.appendChild(o); });
+      var iOpc = el('input'); iOpc.type = 'text'; iOpc.placeholder = 'Opciones separadas por comas'; iOpc.style.display = 'none';
+      var lObl = el('label', 'check'); var cbObl = el('input'); cbObl.type = 'checkbox';
+      lObl.append(cbObl, document.createTextNode('Obligatorio'));
+      var bAdd = el('button', 'btn sec mini', 'Añadir campo'); bAdd.type = 'button';
+      sTipo.addEventListener('change', function () { iOpc.style.display = sTipo.value === 'select' ? '' : 'none'; });
+      var filaNuevo = el('div', 'ec-nuevo-fila');
+      filaNuevo.append(iLabel, sTipo);
+      nuevo.append(filaNuevo, iOpc, lObl, bAdd);
+
+      var vista = el('div', 'ec-vista');
+
+      function aviso(t) { errEd.textContent = t; errEd.style.display = t ? 'block' : 'none'; }
+
+      function boton(txt, titulo, fn, desactivado) {
+        var b = el('button', 'btn-icono ec-btn', txt); b.type = 'button'; b.title = titulo; b.setAttribute('aria-label', titulo);
+        b.disabled = !!desactivado;
+        b.addEventListener('click', fn);
+        return b;
+      }
+
+      function pintar() {
+        ctx.clear(filas); ctx.clear(comunes); ctx.clear(vista);
+        lista.forEach(function (d, i) {
+          var f = el('div', 'ec-fila');
+          var nom = el('div', 'ec-nombre', d.label);
+          nom.appendChild(el('span', 'ec-tipo', ' · ' + CF.TIPOS[d.tipo] + (d.tipo === 'select' ? ' (' + d.opciones.join(', ') + ')' : '')));
+          var lo = el('label', 'check ec-obl'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = d.obligatorio;
+          cb.addEventListener('change', function () { d.obligatorio = cb.checked; pintar(); });
+          lo.append(cb, document.createTextNode('Obligatorio'));
+          f.append(nom, lo,
+            boton('↑', 'Subir', function () { lista.splice(i - 1, 0, lista.splice(i, 1)[0]); pintar(); }, i === 0),
+            boton('↓', 'Bajar', function () { lista.splice(i + 1, 0, lista.splice(i, 1)[0]); pintar(); }, i === lista.length - 1),
+            boton('✕', 'Quitar', function () { lista.splice(i, 1); pintar(); }));
+          filas.appendChild(f);
+        });
+        var fuera = CF.COMUNES.filter(function (c) { return !lista.some(function (d) { return d.key === c.key; }); });
+        if (fuera.length) {
+          comunes.appendChild(el('span', 'p-note', 'Comunes desactivados: '));
+          fuera.forEach(function (c) {
+            var b = el('button', 'btn sec mini', '+ ' + c.label); b.type = 'button';
+            b.addEventListener('click', function () { lista.push(CF.copia(c)); pintar(); });
+            comunes.appendChild(b);
+          });
+        }
+        vista.appendChild(el('p', 'lbl', 'Vista previa del formulario'));
+        var f2 = el('form', 'ec-form'); f2.noValidate = true;
+        f2.addEventListener('submit', function (ev) { ev.preventDefault(); });
+        CF.pintar(f2, lista, null, 'pv-');
+        var falso = el('button', 'btn', 'Enviar solicitud'); falso.type = 'button'; falso.disabled = true;
+        f2.appendChild(falso);
+        vista.appendChild(f2);
+      }
+
+      bAdd.addEventListener('click', function () {
+        aviso('');
+        var label = iLabel.value.trim();
+        if (!label) { aviso('Escribe la pregunta del campo.'); return; }
+        if (lista.length >= 25) { aviso('Máximo 25 campos.'); return; }
+        var d = { key: CF.claveDe(label, lista.map(function (x) { return x.key; })), label: label, tipo: sTipo.value, obligatorio: cbObl.checked };
+        if (d.tipo === 'select') {
+          d.opciones = iOpc.value.split(',').map(function (o) { return o.trim(); }).filter(Boolean);
+          if (!d.opciones.length) { aviso('Un desplegable necesita al menos una opción.'); return; }
+        }
+        lista.push(d);
+        iLabel.value = ''; iOpc.value = ''; cbObl.checked = false;
+        pintar();
+      });
+
+      pintar();
+      wrap.append(filas, comunes, errEd, nuevo, vista);
+      wrap.appendChild(el('p', 'p-note', 'Los cambios de campos se guardan con «Guardar ficha».'));
+      return { wrap: wrap, valor: function () { return lista.map(CF.copia); } };
+    }
+
     // Color: selector visual + hex editable, sincronizados. conContraste: además, contraste con blanco en vivo.
     function campoColor(etiqueta, valor, conContraste) {
       var f = el('div', 'field');
@@ -293,17 +376,9 @@
       var color = campoTexto('Color principal del tema (hex, opcional)', 'text');
       color.input.placeholder = '#1C4C98';
 
-      var fCampos = el('div', 'field');
-      fCampos.appendChild(el('label', 'lbl', 'Campos del formulario público'));
-      var casillas = {};
-      CAMPOS_DISPONIBLES.forEach(function (c) {
-        var w = el('label', 'check');
-        var cb = el('input'); cb.type = 'checkbox'; cb.checked = c[0] !== 'interes_venta_alquiler';
-        casillas[c[0]] = cb;
-        w.appendChild(cb);
-        w.appendChild(document.createTextNode(c[1]));
-        fCampos.appendChild(w);
-      });
+      // Campaña nueva: nace con los cinco campos comunes; se quitan, añaden o reordenan después en su ficha.
+      var fCampos = el('p', 'p-note', 'El formulario público empezará con los campos comunes (nombre, apellidos, ' +
+        'teléfono, email y código postal). Podrás quitarlos, añadir otros y ordenarlos en la ficha de la campaña.');
 
       var guardar = el('button', 'btn', 'Crear campaña'); guardar.type = 'submit';
       form.append(err, fNombre, fSlug, fEmailDestino, fLimite, razon.wrap, cif.wrap, emailPriv.wrap,
@@ -337,7 +412,9 @@
           sector: valOrNull(sector.input),
           zona: valOrNull(zona.input),
           tema_color: colorHex,
-          campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
+          campos_formulario: window.CandyFormulario.COMUNES.map(window.CandyFormulario.copia),
+          // Lista antigua de claves, solo por compatibilidad mientras quede algo que la lea.
+          campos: ['nombre', 'telefono', 'email']
         };
         guardar.disabled = true;
         ctx.api('/rest/v1/anunciantes_destino', { method: 'POST', body: JSON.stringify(payload) })
@@ -756,18 +833,8 @@
       }
       sec.appendChild(bloqueLogo(a, color.input, colorSec.input, iEscala));
 
-      var fCampos = el('div', 'field');
-      fCampos.appendChild(el('label', 'lbl', 'Campos del formulario público'));
-      var casillas = {};
-      var actuales = Array.isArray(a.campos) ? a.campos : [];
-      CAMPOS_DISPONIBLES.forEach(function (c) {
-        var w = el('label', 'check');
-        var cb = el('input'); cb.type = 'checkbox'; cb.checked = actuales.indexOf(c[0]) !== -1;
-        casillas[c[0]] = cb;
-        w.appendChild(cb);
-        w.appendChild(document.createTextNode(c[1]));
-        fCampos.appendChild(w);
-      });
+      var editor = editorCampos(a);
+      var fCampos = editor.wrap;
 
       var guardar = el('button', 'btn', 'Guardar ficha'); guardar.type = 'submit';
       var msg = el('p', 'p-note');
@@ -798,8 +865,13 @@
           zona: valOrNull(zona.input),
           tema_color: colorHex,
           tema_color_secundario: colorSecHex,
-          campos: CAMPOS_DISPONIBLES.map(function (c) { return c[0]; }).filter(function (k) { return casillas[k].checked; })
+          campos_formulario: editor.valor(),
+          // Lista antigua de claves, solo por compatibilidad mientras quede algo que la lea.
+          campos: editor.valor().map(function (d) { return d.key; }).filter(function (k) { return window.CandyFormulario.LEGADO[k]; })
         };
+        if (!payload.campos_formulario.length) {
+          err.textContent = 'El formulario necesita al menos un campo.'; err.style.display = 'block'; return;
+        }
         if (iEscala) payload.logo_landing_escala = parseInt(iEscala.value, 10);
         if (conOrigen) {
           if (!colorHex) payload.tema_color_origen = null;
