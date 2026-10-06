@@ -103,9 +103,31 @@ label.check.ec-obl{margin:0;font-size:13px;white-space:nowrap;}
 .estado-fila{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 button.btn.sec.peligro{color:var(--err);border-color:var(--err);}
 button.btn.sec.peligro:hover{background:var(--err-bg);}
-/* CRM a pantalla completa (pestaña registrada con ancho: true) */
-body.modo-ancho .panel-wrap{max-width:none;padding-left:12px;padding-right:12px;}
-body.modo-ancho #app{padding:14px;}
+/* CRM a pantalla completa (pestaña registrada con ancho: true): se ve como una página propia. Arriba solo
+   una barra fina con el logo, las pestañas, el estado de guardado y «Salir»; el resto de la ventana es el
+   CRM. Sigue dentro del panel porque es el panel quien guarda la sesión con doble factor. */
+body.modo-ancho{overflow:hidden;background:#F6F5FB;}
+body.modo-ancho header.logo-top{position:fixed;top:0;left:0;z-index:21;height:52px;margin:0;padding:0 14px;border:0;background:transparent;display:flex;align-items:center;}
+body.modo-ancho .logo-top .logo img{height:34px;}
+body.modo-ancho .logo-top .logo img + img{height:24px;margin-left:-4px;}
+body.modo-ancho .panel-wrap{max-width:none;margin:0;padding:0;}
+/* overflow:visible: con el recorte de la tarjeta (alto 0, todo es fixed) Chrome no pinta el iframe aislado. */
+body.modo-ancho #app{border:0;border-radius:0;box-shadow:none;padding:0;background:transparent;overflow:visible;position:static;}
+body.modo-ancho #app::before{display:none;}
+body.modo-ancho .p-tabs{position:fixed;top:0;left:0;right:0;z-index:20;height:52px;margin:0;padding:0 16px 0 160px;flex-wrap:nowrap;overflow-x:auto;background:#fff;border-bottom:1px solid var(--border);box-shadow:0 1px 6px rgba(15,15,20,.04);}
+body.modo-ancho .crm-barra{position:fixed;top:0;right:84px;z-index:22;height:52px;margin:0;gap:10px;flex-wrap:nowrap;}
+body.modo-ancho .crm-titulo{display:none;}
+body.modo-ancho .crm-estado{flex:none;min-width:0;font-size:12.5px;white-space:nowrap;}
+/* Conflicto o error: el aviso es largo, va en una franja bajo la barra en vez de dentro de ella. */
+body.modo-ancho .crm-estado.mal{position:fixed;top:52px;left:0;right:0;z-index:22;white-space:normal;background:var(--err-bg);padding:8px 16px;border-bottom:1px solid rgba(220,38,38,.25);}
+body.modo-ancho .crm-marco{position:fixed;top:52px;left:0;width:100%;height:calc(100vh - 52px);height:calc(100dvh - 52px);min-height:0;border:0;border-radius:0;}
+@media (max-width:760px){
+  body.modo-ancho header.logo-top{display:none;}
+  body.modo-ancho .p-tabs{padding-left:10px;}
+  body.modo-ancho .crm-barra{top:52px;left:0;right:0;height:30px;padding:0 12px;background:#fff;border-bottom:1px solid var(--border);}
+  body.modo-ancho .crm-estado.mal{top:82px;}
+  body.modo-ancho .crm-marco{top:82px;height:calc(100vh - 82px);height:calc(100dvh - 82px);}
+}
 .crm-barra{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
 .crm-titulo{font-weight:700;color:var(--ink);}
 .crm-estado{font-size:13px;color:var(--muted);flex:1;min-width:200px;}
