@@ -1,0 +1,11 @@
+Librerías de terceros alojadas aquí (antes se cargaban de un CDN; Candy Ads no carga nada de terceros).
+
+chart.umd.min.js — Chart.js 4.4.1 — https://www.chartjs.org
+  Licencia MIT. Copyright (c) 2014-2022 Chart.js Contributors.
+  Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia de este software… (texto
+  completo: https://github.com/chartjs/Chart.js/blob/v4.4.1/LICENSE.md). Descargado de cdnjs; su sha512
+  coincide con el SRI publicado por cdnjs para esa versión.
+
+xlsx.full.min.js — SheetJS Community Edition 0.20.1 — https://sheetjs.com
+  Licencia Apache 2.0. Copyright (C) 2013-present SheetJS LLC. Texto completo:
+  https://git.sheetjs.com/sheetjs/sheetjs/src/tag/v0.20.1/LICENSE. Descargado de cdn.sheetjs.com (origen oficial).

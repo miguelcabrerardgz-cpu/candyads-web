@@ -100,8 +100,23 @@
 | **Destinatarios / encargados** | Encargado: Supabase (autenticación) |
 | **Transferencias internacionales** | Procesamiento en la UE |
 | **Plazo de conservación** | Mientras la persona sea administradora, más [1 año] |
-| **Medidas de seguridad** | Autenticación con contraseña, RLS, panel con cabeceras de seguridad (CSP) y `noindex` |
+| **Medidas de seguridad** | Autenticación con contraseña y doble factor obligatorio (TOTP, exigido también en la base de datos), RLS, registro público de cuentas cerrado, panel con cabeceras de seguridad (CSP) y `noindex` |
+
+## 8. CRM comercial (prospección y seguimiento de clientes)
+
+| | |
+|---|---|
+| **Rol de Candy Ads** | Responsable |
+| **Interesados** | Personas de contacto de empresas clientes o potenciales clientes (anunciantes y establecimientos de hostelería) |
+| **Categorías de datos** | Nombre de la empresa, persona de contacto, teléfonos, email, dirección, CIF, sector; notas, llamadas, visitas, recordatorios, presupuestos y pedidos; PDF adjuntos (ofertas, fichas) |
+| **Finalidad** | Prospección comercial y seguimiento de la relación con clientes y potenciales clientes |
+| **Base jurídica** | Interés legítimo en la prospección y gestión comercial B2B (art. 6.1.f RGPD); ejecución de contrato o medidas precontractuales con clientes (art. 6.1.b). **Ojo:** las comunicaciones comerciales por email o WhatsApp a quien no es cliente requieren su consentimiento previo (art. 21 LSSI-CE); las plantillas del CRM no lo sustituyen |
+| **Origen de los datos** | El propio interesado o fuentes de acceso público (directorios, webs de empresa). Si no los facilitó el interesado, hay que informarle en el primer contacto o como mucho en un mes (art. 14 RGPD) |
+| **Destinatarios / encargados** | Encargado: Supabase (base de datos, Fráncfort) |
+| **Transferencias internacionales** | Procesamiento en la UE (Fráncfort); Supabase con Cláusulas Contractuales Tipo para cualquier acceso desde fuera del EEE |
+| **Plazo de conservación** | Potenciales clientes: hasta que pidan la baja o 2 años sin contacto; clientes: durante la relación y después el plazo de prescripción fiscal. Revisión periódica desde la papelera del CRM |
+| **Medidas de seguridad** | Solo administradores del panel con doble factor (RLS `es_admin()`); el CRM corre aislado del resto del panel (iframe sandbox sin acceso a la sesión ni a la red); los datos no quedan en el navegador; control de versiones y copia histórica automática (`crm_historial`); sin librerías ni servicios de terceros cargados en el CRM |
 
 ---
 
-**Última actualización:** 2026-09-22. Próxima revisión recomendada: cuando se incorpore el primer anunciante en producción real, o cada 12 meses.
+**Última actualización:** 2026-10-06 (se añade la actividad 8, CRM comercial; doble factor en la 7). Próxima revisión recomendada: cuando se incorpore el primer anunciante en producción real, o cada 12 meses.

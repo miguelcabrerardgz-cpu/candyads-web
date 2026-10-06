@@ -103,3 +103,12 @@ label.check.ec-obl{margin:0;font-size:13px;white-space:nowrap;}
 .estado-fila{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 button.btn.sec.peligro{color:var(--err);border-color:var(--err);}
 button.btn.sec.peligro:hover{background:var(--err-bg);}
+/* CRM a pantalla completa (pestaña registrada con ancho: true) */
+body.modo-ancho .panel-wrap{max-width:none;padding-left:12px;padding-right:12px;}
+body.modo-ancho #app{padding:14px;}
+.crm-barra{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.crm-titulo{font-weight:700;color:var(--ink);}
+.crm-estado{font-size:13px;color:var(--muted);flex:1;min-width:200px;}
+.crm-estado.ok{color:var(--ok);}
+.crm-estado.mal{color:var(--err);}
+.crm-marco{display:block;width:100%;height:calc(100vh - 210px);min-height:600px;border:1px solid var(--border);border-radius:12px;background:#F6F5FB;}

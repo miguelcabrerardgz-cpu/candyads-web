@@ -291,6 +291,8 @@
       if (!h) return;
       Object.keys(botones).forEach(function (k) { botones[k].classList.toggle('activa', k === h.id); });
       try { history.replaceState(null, '', '#' + h.id); } catch (e) { /* sin historial: da igual */ }
+      // Herramientas que necesitan toda la pantalla (p. ej. el CRM) se registran con ancho: true.
+      document.body.classList.toggle('modo-ancho', !!h.ancho);
       clear(cont);
       h.montar(cont, ctx, param);
     }

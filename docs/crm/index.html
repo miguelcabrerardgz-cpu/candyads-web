@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<!-- Este documento solo funciona dentro del panel (iframe aislado: sandbox sin allow-same-origin). Sin red
+     propia (connect-src 'none'): los datos los pide y los guarda el panel. 'unsafe-inline' es por los
+     onclick del CRM; el aislamiento del marco es lo que impide que llegue a la sesión del panel. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>CRM · Candy Ads</title>
+<link rel="icon" type="image/png" href="/assets/candyads-icono.png">
+<link rel="stylesheet" href="/assets/fonts.css">
+<script id="ncrm-embedded-data" type="application/json">{}</script>
+<link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+
+<div class="mobile-overlay" id="mobile-overlay" onclick="cerrarSidebarMovil()"></div>
+<button class="sidebar-toggle open" id="sidebar-toggle" onclick="toggleSidebar()" title="Ocultar/mostrar panel">☰</button>
+
+<div class="sidebar" id="sidebar">
+
+  <!-- ═══ ZONA SUPERIOR FIJA (header + alertas + cuota + buscador + filtros) ═══ -->
+  <div class="sb-top">
+    <div class="sidebar-header">
+      <div class="brand" id="brand-box" style="padding:4px 0 14px;width:100%;display:flex;justify-content:center;"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button onclick="toggleDarkMode()" title="Cambiar tema" style="width:34px;min-width:34px;padding:0;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;"><span id="dark-icon">🌙</span></button>
+      </div>
+      <button class="btn-new" onclick="abrirModalCliente(false)">＋ Nueva Empresa</button>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        <button class="btn-new" onclick="abrirKanban()" style="flex:1;background:var(--accent2);">📋 Kanban</button>
+        <button class="btn-new" onclick="abrirCalendarioGlobal()" style="flex:1;background:rgba(99,102,241,0.85);" title="Calendario global">📅 Agenda</button>
+        <button onclick="abrirHerramientas()" title="Herramientas" style="width:36px;min-width:36px;padding:0;border-radius:10px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;">⚙️</button>
+      </div>
+    </div>
+
+    <div id="alerts-wrapper" style="display:none;">
+      <div onclick="toggleAlertas()" style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;cursor:pointer;background:rgba(251,191,36,0.08);border-top:1px solid rgba(251,191,36,0.2);border-bottom:1px solid rgba(251,191,36,0.2);user-select:none;">
+        <div style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#d97706;">
+          <span>&#x1F514;</span>
+          <span>Recordatorios pendientes</span>
+          <span id="alerts-badge" style="background:#d97706;color:#fff;border-radius:20px;font-size:10px;font-weight:700;padding:1px 7px;min-width:18px;text-align:center;">0</span>
+        </div>
+        <span id="alerts-arrow" style="font-size:10px;color:#d97706;transition:transform .2s;">&#x25BC;</span>
+      </div>
+      <div class="alerts-panel" id="alerts-panel" style="max-height:160px;overflow-y:auto;"></div>
+    </div>
+
+    <div class="riesgo-banner" id="riesgo-banner" onclick="filtrarRiesgo()">
+      <div class="riesgo-titulo">⚠️ Clientes en riesgo de perderse</div>
+      <div class="riesgo-lista" id="riesgo-lista"></div>
+    </div>
+
+    <div style="text-align:center;padding:4px 0 6px;cursor:pointer;" id="sync-status-wrap" onclick="sbForzarSync()" title="Clic para sincronizar"><span class="sync-badge sync-busy"><span class="sync-spin">&#x27F3;</span> Conectando...</span></div>
+
+    <div id="cuota-wrap" style="padding:6px 12px 4px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;">🎯 Objetivo mensual</span>
+        <button onclick="toggleCuotaEdit()" id="cuota-edit-btn" style="font-size:10px;background:none;border:none;color:var(--text3);cursor:pointer;padding:0;">✏️</button>
+      </div>
+      <div id="cuota-edit-wrap" style="display:none;margin-bottom:6px;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input id="cuota-input" type="number" min="0" step="1000" class="form-input" style="font-size:12px;padding:4px 8px;flex:1;" placeholder="50000">
+          <button onclick="guardarCuota()" style="padding:4px 10px;font-size:11px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;">OK</button>
+        </div>
+      </div>
+      <div id="cuota-barra-wrap" style="cursor:pointer;" onclick="abrirDetalleCuota()">
+        <div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px;">
+          <div id="cuota-barra" style="height:100%;width:0%;border-radius:6px;transition:width .4s ease;background:#e74c3c;"></div>
+        </div>
+        <div id="cuota-label" style="font-size:11px;color:var(--text3);text-align:center;"></div>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <input id="input-buscador" class="search-input" type="text" placeholder="🔍  Buscar empresa..." onkeyup="filtrarClientes()">
+      <select id="filtro-provincia" class="search-input" onchange="filtrarClientes()">
+        <option value="">Todas las provincias</option>
+      </select>
+    </div>
+    <div class="filtro-temp" id="filtro-temp">
+      <button class="btn-filtro-temp active" data-temp="todos" onclick="setFiltroTemp(this,'todos')">Todos</button>
+      <button class="btn-filtro-temp" data-temp="hot" onclick="setFiltroTemp(this,'hot')">🔥 Cal.</button>
+      <button class="btn-filtro-temp" data-temp="warm" onclick="setFiltroTemp(this,'warm')">☀️ Tib.</button>
+      <button class="btn-filtro-temp" data-temp="cool" onclick="setFiltroTemp(this,'cool')">❄ Frío</button>
+      <button class="btn-filtro-temp" data-temp="cold" onclick="setFiltroTemp(this,'cold')">🧊 Inact.</button>
+    </div>
+  </div><!-- /sb-top -->
+
+  <!-- ═══ ZONA CENTRAL CON SCROLL PROPIO (lista de clientes) ═══ -->
+  <div class="sb-middle">
+    <div class="client-list" id="ul-clientes"></div>
+  </div><!-- /sb-middle -->
+
+  <!-- ═══ ZONA INFERIOR (solo inputs ocultos — accordions en modal) ═══ -->
+  <div class="sb-bottom" style="border-top:none;">
+    <input type="file" id="archivo-csv" accept=".csv,.txt,.xls,.xlsx" style="display:none;" onchange="importarCSV(event)">
+    <!-- btn-dormidos oculto, usado por calcularRiesgo() -->
+    <button id="btn-dormidos" style="display:none;" onclick="abrirDormidos()"><span id="dormidos-badge"></span></button>
+    <!-- panel-hoy: oculto aquí, usado por renderPanelHoy() -->
+    <div id="panel-hoy" style="display:none;"></div>
+  </div><!-- /sb-bottom -->
+
+</div>
+
+<!-- ═══ COLUMNA PRINCIPAL ═══ -->
+<div class="main-col">
+  <div class="main" id="main-area"></div>
+</div>
+
+
+<div class="modal-bg" id="modal-cliente">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-cli-title">Nueva Empresa</div>
+
+    <div class="form-group"><label>Nombre de la empresa *</label><input class="form-input" id="cli-nombre" type="text" placeholder="Empresa S.L."></div>
+    <div class="form-group"><label>Persona de contacto</label><input class="form-input" id="cli-contacto" type="text" placeholder="Juan García"></div>
+
+    <div class="form-row">
+      <div class="form-group"><label>Teléfono móvil</label><input class="form-input" id="cli-telefono" type="text" placeholder="6xx xxx xxx"></div>
+      <div class="form-group"><label>Teléfono fijo</label><input class="form-input" id="cli-telefono-fijo" type="text" placeholder="9xx xxx xxx"></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label>Email</label><input class="form-input" id="cli-email" type="email"></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:3;"><label>Calle y número</label><input class="form-input" id="cli-direccion" type="text" placeholder="Calle Mayor, 15..."></div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" style="flex:1.5;">
+        <label>Provincia</label>
+        <input class="form-input" id="cli-provincia" type="text" list="dl-provincias" placeholder="Provincia / región" autocomplete="off"><datalist id="dl-provincias"></datalist>
+      </div>
+      <div class="form-group" style="flex:1.5;">
+        <label>Municipio</label>
+        <input class="form-input" id="cli-municipio" type="text" placeholder="Municipio / localidad">
+      </div>
+      <div class="form-group" style="flex:0.8;">
+        <label>Cód. Postal</label>
+        <input class="form-input" id="cli-cp" type="text" placeholder="Código postal" maxlength="5">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group"><label>Sector</label>
+      <select class="form-input" id="cli-sector">
+        <option value="">— Selecciona sector —</option>
+        <option value="Comercio y retail">Comercio y retail</option>
+        <option value="Industria y manufactura">Industria y manufactura</option>
+        <option value="Servicios profesionales">Servicios profesionales</option>
+        <option value="Tecnología">Tecnología</option>
+        <option value="Alimentación y bebidas">Alimentación y bebidas</option>
+        <option value="Hostelería y restauración">Hostelería y restauración</option>
+        <option value="Salud y farmacia">Salud y farmacia</option>
+        <option value="Construcción e inmobiliaria">Construcción e inmobiliaria</option>
+        <option value="Educación">Educación</option>
+        <option value="Administración pública / ONG">Administración pública / ONG</option>
+        <option value="Otros">Otros</option>
+      </select></div>
+      <div class="form-group"><label>CIF / NIF</label><input class="form-input" id="cli-cif" type="text"></div>
+    </div>
+
+    <div class="form-group" style="margin-top:4px;">
+      <label>Tipo de cliente</label>
+      <select class="form-input" id="cli-etiqueta">
+        <option value="Recurrente">⭐ Recurrente — ha pedido en los últimos 6 meses</option>
+        <option value="Ocasional">🔶 Ocasional — más de 6 meses sin pedir</option>
+        <option value="Perdido">🔴 Cliente perdido — más de 1 año sin pedir</option>
+        <option value="NoCliente">⚫ No cliente — nunca ha comprado</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-top:4px;">
+      <label>Fase Pipeline</label>
+      <select class="form-input" id="cli-pipeline">
+        <option value="prospecto">🔵 Prospecto</option>
+        <option value="pendiente-datos">📋 Pendiente de datos</option>
+        <option value="presupuestado">📄 Presupuestado</option>
+        <option value="negociacion">🤝 Negociación</option>
+        <option value="pedido-curso">📦 Pedido en curso</option>
+        <option value="cliente-recurrente">⭐ Cliente recurrente</option>
+        <option value="cliente-ocasional">🔶 Cliente ocasional</option>
+        <option value="cliente-perdido">🔴 Cliente perdido (+1 año)</option>
+        <option value="no-cliente">⚫ No cliente (nunca ha comprado)</option>
+        <option value="perdido">❌ Descartado</option>
+      </select>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-cliente')">Cancelar</button>
+      <button class="btn-save" onclick="guardarCliente()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-pedido">
+  <div class="modal-box wide">
+    <div class="modal-title" id="ped-modal-title">📦 Nuevo Pedido</div>
+    <div class="form-row">
+      <div class="form-group"><label>Nº de pedido</label><input class="form-input" id="ped-id" type="text" placeholder="PED-001 (automático si se deja vacío)"></div>
+      <div class="form-group"><label>Concepto / referencia</label><input class="form-input" id="ped-ref" type="text" placeholder="Descripción breve del pedido"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Nombre empresa</label><input class="form-input" id="ped-empresa" type="text" placeholder="Empresa S.L."></div>
+      <div class="form-group"><label>CIF / NIF</label><input class="form-input" id="ped-cif" type="text" placeholder="B12345678"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Cantidad</label><input class="form-input" id="ped-cantidad" type="number" placeholder="0" min="0" step="any" oninput="calcularImportePedido()"></div>
+      <div class="form-group"><label>Precio unitario (€)</label><input class="form-input" id="ped-precio" type="number" placeholder="0.00" step="0.01" min="0" oninput="calcularImportePedido()"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Otros cargos / descuento (€) <span style="font-size:10px;color:var(--text3);">— opcional, se suma al total (negativo = descuento)</span></label>
+        <input class="form-input" id="ped-extras" type="number" placeholder="0.00" step="0.01" oninput="calcularImportePedido()">
+      </div>
+    </div>
+    <div class="form-row" style="align-items:center;">
+      <div class="form-group">
+        <label>Importe total (€) <span style="font-size:10px;color:var(--text3);font-weight:400;">— calculado automáticamente</span></label>
+        <input class="form-input" id="ped-importe" type="text" placeholder="Se calcula solo" readonly
+          style="background:var(--bg2);color:var(--accent2);font-weight:700;font-size:15px;cursor:default;">
+      </div>
+      <div style="padding-top:22px;font-size:11.5px;color:var(--text3);white-space:nowrap;min-width:140px;" id="ped-formula-label"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha pedido</label><input class="form-input" id="ped-fecha" type="date"></div>
+      <div class="form-group"><label>Fecha entrega</label><input class="form-input" id="ped-entrega" type="date"></div>
+    </div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select class="form-input" id="ped-estado">
+        <option value="Pendiente">⏳ Pendiente</option>
+        <option value="Enviado">📦 Enviado</option>
+        <option value="Pagado">✅ Pagado</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>📝 Notas del pedido</label>
+      <textarea class="form-input" id="ped-notas" rows="2" placeholder="Observaciones, instrucciones..." style="resize:vertical;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-pedido')">Cancelar</button>
+      <button class="btn-save" onclick="guardarPedido()">Guardar pedido</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-informe">
+  <div class="modal-box wide">
+    <div class="modal-title">📋 Informe de Actividad</div>
+    <div class="informe-modo-btns">
+      <button class="informe-modo-btn active" id="modo-email-btn" onclick="setModoInforme('email')">✉️ Plantilla Email</button>
+      <button class="informe-modo-btn" id="modo-rapido-btn" onclick="setModoInforme('rapido')">⚡ Resumen rápido</button>
+    </div>
+    <div class="report-btn-group">
+      <button class="btn-report-gen btn-diario" onclick="generarInforme('diario')">📅 Diario (Hoy)</button>
+      <button class="btn-report-gen btn-semanal" onclick="generarInforme('semanal')">📆 Semanal (7 días)</button>
+    </div>
+    <textarea class="report-textarea" id="texto-informe" placeholder="Pulsa un botón para generar el informe..." style="min-height:300px;"></textarea>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-informe')">Cerrar</button>
+      <button class="btn-save" onclick="copiarInforme()" style="background:var(--surface3);color:var(--text);">📋 Copiar texto</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-import">
+  <div class="modal-box wide">
+    <div class="modal-title">📤 Resultado de importación</div>
+    <div class="import-log" id="import-log"></div>
+    <div class="modal-footer">
+      <button class="btn-save" onclick="cerrarModal('modal-import')">Listo</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-google">
+  <div class="modal-box wide">
+    <div class="modal-title">🔗 Google Calendar & Tasks</div>
+
+    
+    <div style="background:rgba(124,58,237,0.05);border:1px solid rgba(124,58,237,0.15);border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;">Conexión OAuth 2.0</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px;">
+        Necesitas un <strong>Client ID</strong> de <a href="https://console.cloud.google.com" target="_blank" style="color:var(--accent);">Google Cloud Console</a> con los APIs de Calendar y Tasks habilitados y <code style="background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px;">file://</code> o tu dominio como origen autorizado.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input class="form-input" id="g-client-id" type="text" placeholder="Client ID: xxxxxx.apps.googleusercontent.com" style="flex:1;font-size:12px;">
+        <button class="btn-save" onclick="conectarGoogle()" style="white-space:nowrap;padding:9px 16px;">Conectar</button>
+      </div>
+      <button onclick="desconectarGoogle()" style="margin-top:8px;background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;text-decoration:underline;">Desconectar cuenta</button>
+    </div>
+
+    
+    <div class="gtabs">
+      <button class="gtab active" id="gtab-cal" onclick="switchGTab('cal')">📅 Calendar</button>
+      <button class="gtab" id="gtab-tasks" onclick="switchGTab('tasks')">☑️ Tasks</button>
+    </div>
+
+    
+    <div id="gpanel-cal">
+      <div class="gadd-form">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);">Nuevo evento</div>
+        <input id="gcal-titulo" type="text" placeholder="Título del evento">
+        <div class="gadd-form-row">
+          <input id="gcal-fecha" type="date">
+          <input id="gcal-hora" type="time">
+        </div>
+        <button class="btn-save" onclick="anadirEvento()" style="align-self:flex-end;padding:8px 16px;">+ Añadir evento</button>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">Próximos eventos</div>
+      <div class="g-lista" id="gcal-eventos">
+        <div style="color:var(--text3);font-size:12px;">Conecta Google para ver tus eventos</div>
+      </div>
+    </div>
+
+    
+    <div id="gpanel-tasks" style="display:none;">
+      <div class="gadd-form">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);">Nueva tarea</div>
+        <input id="gtask-titulo" type="text" placeholder="Título de la tarea">
+        <input id="gtask-fecha" type="date" placeholder="Fecha límite (opcional)">
+        <button class="btn-save" onclick="anadirTarea()" style="align-self:flex-end;padding:8px 16px;">+ Añadir tarea</button>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;">Tareas pendientes</div>
+      <div class="g-lista" id="gtasks-lista">
+        <div style="color:var(--text3);font-size:12px;">Conecta Google para ver tus tareas</div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-google')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-visita">
+  <div class="modal-box">
+    <div class="modal-title">🚗 Registrar Visita</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha de la visita</label>
+        <input class="form-input" id="vis-fecha" type="date">
+      </div>
+      <div class="form-group">
+        <label>Lugar / Dirección</label>
+        <input class="form-input" id="vis-lugar" type="text" placeholder="Dirección o nombre del lugar">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Hora inicio</label>
+        <input class="form-input" id="vis-hora-ini" type="time" value="09:00">
+      </div>
+      <div class="form-group">
+        <label>Hora fin (opcional)</label>
+        <input class="form-input" id="vis-hora-fin" type="time">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Notas / Resumen de la visita</label>
+      <textarea class="form-input" id="vis-notas" rows="3" placeholder="Qué se habló, acuerdos, próximos pasos..." style="resize:vertical;min-height:70px;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-visita')">Cancelar</button>
+      <button class="btn-save" onclick="guardarVisita()">💾 Guardar visita</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-gcal-confirm" style="z-index:1100;">
+  <div class="modal-box" style="max-width:420px;text-align:center;">
+    <div style="font-size:36px;margin-bottom:8px;" id="gcal-confirm-ico">📅</div>
+    <div class="modal-title" style="justify-content:center;" id="gcal-confirm-titulo">¿Añadir a Google Calendar?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;" id="gcal-confirm-texto"></div>
+    <div id="gcal-confirm-acciones" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-gtask-confirm" style="z-index:1100;">
+  <div class="modal-box" style="max-width:420px;text-align:center;">
+    <div style="font-size:36px;margin-bottom:8px;" id="gtask-confirm-ico">☑️</div>
+    <div class="modal-title" style="justify-content:center;" id="gtask-confirm-titulo">¿Añadir a Google Tasks?</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7;" id="gtask-confirm-texto"></div>
+    <div id="gtask-confirm-acciones" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-recordatorio">
+  <div class="modal-box" style="max-width:420px;padding:0;border-radius:12px;overflow:hidden;">
+    
+    <div style="background:#fff;padding:16px 20px 0;border-bottom:1px solid #e8eaed;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="width:20px;height:20px;border-radius:50%;border:2px solid #bbb;flex-shrink:0;"></div>
+        <input id="rec-texto" type="text" placeholder="Añadir una tarea"
+          style="flex:1;border:none;outline:none;font-size:16px;font-weight:500;color:#202124;background:transparent;font-family:inherit;"
+          onkeydown="if(event.key==='Enter')document.getElementById('rec-notas').focus()">
+      </div>
+      
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;padding-left:30px;">
+        <svg style="width:16px;height:16px;flex-shrink:0;margin-top:3px;opacity:.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <textarea id="rec-notas" placeholder="Añadir detalles"
+          style="flex:1;border:none;outline:none;font-size:13.5px;color:#3c4043;background:transparent;font-family:inherit;resize:none;min-height:48px;line-height:1.5;"
+          rows="2"></textarea>
+      </div>
+      
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-left:30px;">
+        <svg style="width:16px;height:16px;flex-shrink:0;opacity:.5;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <input id="rec-fecha" type="date"
+          style="border:none;outline:none;font-size:13.5px;color:#3c4043;background:transparent;font-family:inherit;cursor:pointer;">
+      </div>
+    </div>
+    
+    <div style="background:#f8f9fa;padding:12px 16px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
+      <span style="font-size:11px;color:#80868b;margin-right:auto;">CRM → Google Tasks</span>
+      <button onclick="cerrarModal('modal-recordatorio')"
+        style="border:none;background:transparent;padding:8px 14px;border-radius:4px;font-size:13px;color:#444;cursor:pointer;font-family:inherit;">Cancelar</button>
+      <button onclick="guardarRecordatorio()"
+        style="border:none;background:#1a73e8;color:#fff;padding:8px 20px;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-dormidos">
+  <div class="modal-box wide">
+    <div class="modal-title">😴 Clientes Recurrentes Dormidos</div>
+    <div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;">
+      Clientes marcados como <strong>⭐ Recurrente</strong> que llevan más de 90 días sin hacer un pedido. ¡Es hora de llamarles!
+    </div>
+    <div class="dormidos-list" id="dormidos-list"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-dormidos')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Kanban modal moved to end of body -->
+
+
+
+<div class="modal-bg" id="modal-hoy">
+  <div class="modal-box" style="max-width:820px;max-height:90vh;overflow-y:auto;">
+    <div class="modal-title">📋 Resumen del Día</div>
+    <div id="hoy-content"></div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="cerrarModal('modal-hoy')">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-dashboard">
+  <div class="modal-box dashboard">
+    <div class="modal-title">📊 Dashboard — Resumen Global</div>
+    <div class="dash-stat-row" id="dash-stats"></div>
+    <div class="dash-grid">
+      <div class="chart-wrap">
+        <div class="chart-title">Estado de pedidos</div>
+        <canvas id="chart-donut" height="200"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-title">Facturación mensual (año actual)</div>
+        <canvas id="chart-bars" height="200"></canvas>
+      </div>
+    </div>
+    <div class="chart-wrap" style="margin-bottom:0;">
+      <div class="chart-title">Top 10 clientes por facturación</div>
+      <canvas id="chart-top" height="130"></canvas>
+    </div>
+    <div class="modal-footer"><button class="btn-cancel" onclick="cerrarModal('modal-dashboard')">Cerrar</button></div>
+  </div>
+</div>
+
+<!-- Calendar global modal moved to end of body -->
+
+<!-- puente.js recibe los datos del panel y después carga vendor/ (Chart.js, SheetJS) y app.js. -->
+<script src="puente.js?v=1"></script>
+
+<div class="modal-bg" id="modal-presupuesto">
+  <div class="modal-box wide" style="max-width:780px;max-height:92vh;overflow-y:auto;">
+    <div class="modal-title">Nuevo Presupuesto</div>
+    <div class="form-row">
+      <div class="form-group"><label>Cliente / empresa *</label><input class="form-input" id="pres-empresa" type="text"></div>
+      <div class="form-group"><label>Nº presupuesto</label><input class="form-input" id="pres-num-ref" type="text" placeholder="Automático"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>CIF / NIF</label><input class="form-input" id="pres-cif" type="text"></div>
+      <div class="form-group"><label>Persona de contacto</label><input class="form-input" id="pres-contacto" type="text"></div>
+    </div>
+    <div class="form-group"><label>Dirección del cliente</label><input class="form-input" id="pres-direccion" type="text"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha</label><input class="form-input" id="pres-fecha" type="date"></div>
+      <div class="form-group"><label>Válido hasta</label><input class="form-input" id="pres-validez" type="date"></div>
+    </div>
+    <div class="form-group"><label>Asunto / título del presupuesto</label><input class="form-input" id="pres-asunto" type="text" placeholder="Ej.: Propuesta de servicios"></div>
+
+    <div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;">Conceptos</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="color:var(--text3);text-align:left;"><th style="padding:4px;">Descripción</th><th style="padding:4px;">Cant.</th><th style="padding:4px;">Precio ud. (€)</th><th style="padding:4px;">Dto. %</th><th style="padding:4px;text-align:right;">Importe</th><th></th></tr></thead>
+        <tbody id="pres-lineas-body"></tbody>
+      </table>
+    </div>
+    <button type="button" onclick="presAdd()" style="margin-top:8px;padding:6px 12px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;">+ Añadir línea</button>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+      <div style="min-width:260px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Base imponible</span><b id="pres-subtotal">0,00 €</b></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;"><span>IVA <input class="form-input" id="pres-iva" type="number" min="0" max="100" step="any" style="width:64px;display:inline-block;padding:3px 6px;" oninput="presCalc()"> %</span><b id="pres-iva-imp">0,00 €</b></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:2px solid var(--accent);margin-top:4px;font-size:15px;"><span><b>TOTAL</b></span><b id="pres-total" style="color:var(--accent2);">0,00 €</b></div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:10px;"><label>Condiciones (una por línea)</label><textarea class="form-input" id="pres-condiciones" rows="3" style="resize:vertical;"></textarea></div>
+    <div class="form-group"><label>Notas adicionales</label><textarea class="form-input" id="pres-notas" rows="2" style="resize:vertical;"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-presupuesto')">Cancelar</button>
+      <button class="btn-save" onclick="generarPDFPresupuesto()">Generar PDF Presupuesto</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-planificar">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-title" id="plan-title">Planificar</div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha *</label><input class="form-input" id="plan-fecha" type="date"></div>
+      <div class="form-group"><label>Hora</label><input class="form-input" id="plan-hora" type="time"></div>
+    </div>
+    <div class="form-group"><label>Asunto *</label><input class="form-input" id="plan-asunto" type="text" placeholder="Motivo..."></div>
+    <div class="form-group"><label>Notas</label><textarea class="form-input" id="plan-notas" rows="2" style="resize:vertical;"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-planificar')">Cancelar</button>
+      <button class="btn-save" onclick="guardarPlanificado()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-bg" id="modal-papelera">
+  <div class="modal-box" style="max-width:580px;">
+    <div class="modal-title">&#x1F5D1;&#xFE0F; Papelera de reciclaje</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span style="font-size:12px;color:var(--text3);" id="papelera-count"></span>
+      <span style="font-size:11px;color:var(--text3);">Eliminación definitiva tras 30 días</span>
+    </div>
+    <div id="papelera-lista" style="display:flex;flex-direction:column;gap:7px;max-height:55vh;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="vaciarPapelera()" style="background:rgba(220,38,38,0.07);color:#dc2626;border-color:rgba(220,38,38,0.2);">Vaciar papelera</button>
+      <button class="btn-cancel" onclick="cerrarModal('modal-papelera')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-bg" id="modal-plantillas-msg">
+  <div class="modal-box wide">
+    <div class="modal-title">💬 Plantillas de Mensajes</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button onclick="setTipoPlantilla('wa')" id="plt-btn-wa" class="btn-add btn-add-green" style="flex:1;">📱 WhatsApp</button>
+      <button onclick="setTipoPlantilla('email')" id="plt-btn-email" class="btn-add btn-add-blue" style="flex:1;opacity:0.5;">✉️ Email</button>
+    </div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label>Plantilla:</label>
+      <select id="plt-selector" class="form-input" onchange="cargarPlantilla()"></select>
+    </div>
+    <div class="form-group">
+      <label>Texto generado:</label>
+      <textarea id="plt-texto" class="form-input" rows="7" style="margin-top:4px;font-size:13px;white-space:pre-wrap;resize:vertical;"></textarea>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:6px 0 12px;">Variables: {nombre}, {contacto}, {sector}</div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">✏️ Gestionar plantillas</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-cancel" onclick="guardarTextoEnPlantilla()" style="font-size:11px;padding:5px 10px;background:rgba(99,102,241,0.08);color:var(--accent);border-color:rgba(99,102,241,0.3);">💾 Guardar cambios</button>
+        <button class="btn-cancel" onclick="nuevaPlantillaDesdeTexto()" style="font-size:11px;padding:5px 10px;background:rgba(34,197,94,0.07);color:#16a34a;border-color:rgba(34,197,94,0.25);">➕ Guardar como nueva</button>
+        <button class="btn-cancel" onclick="borrarPlantillaActual()" style="font-size:11px;padding:5px 10px;background:rgba(239,68,68,0.07);color:#dc2626;border-color:rgba(239,68,68,0.2);">🗑️ Eliminar esta</button>
+      </div>
+    </div>
+    <div class="modal-footer" style="margin-top:10px;">
+      <button class="btn-cancel" onclick="cerrarModal('modal-plantillas-msg')">Cerrar</button>
+      <button class="btn-save" onclick="copiarPlantilla()" style="background:#25D366;">📋 Copiar</button>
+      <button class="btn-save" onclick="enviarPlantilla()" id="plt-btn-enviar">📱 Abrir WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-seguimiento">
+  <div class="modal-box wide">
+    <div class="modal-title">🔔 Seguimiento de Clientes</div>
+
+    
+    <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:10px;">
+      <button id="seg-tab-lista" onclick="setSegTab('lista')" style="padding:6px 18px;border-radius:8px 8px 0 0;border:none;cursor:pointer;font-size:13px;font-weight:600;background:var(--accent);color:#fff;">📋 Lista</button>
+      <button id="seg-tab-cal" onclick="setSegTab('cal')" style="padding:6px 18px;border-radius:8px 8px 0 0;border:none;cursor:pointer;font-size:13px;font-weight:600;background:var(--surface2);color:var(--text2);">📅 Calendario</button>
+      <button id="seg-tab-dormidos" onclick="setSegTab('dormidos')" style="padding:6px 18px;border-radius:8px 8px 0 0;border:none;cursor:pointer;font-size:13px;font-weight:600;background:var(--surface2);color:var(--text2);">😴 Dormidos</button>
+    </div>
+
+    
+    <div id="seg-panel-lista">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <label style="font-size:13px;">Sin actividad en más de</label>
+        <input id="seg-dias" type="number" value="30" min="1" max="365" class="form-input" style="width:70px;" oninput="renderSeguimiento()">
+        <label style="font-size:13px;">días</label>
+      </div>
+      <div id="seg-lista" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    
+    <div id="seg-panel-cal" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <button onclick="cambiarMesCal(-1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 14px;border-radius:8px;cursor:pointer;font-size:16px;">‹</button>
+        <div id="cal-titulo" style="font-size:16px;font-weight:700;color:var(--text);"></div>
+        <button onclick="cambiarMesCal(1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 14px;border-radius:8px;cursor:pointer;font-size:16px;">›</button>
+      </div>
+      <div id="cal-grid" style="width:100%;"></div>
+      <div id="cal-detalle" style="margin-top:14px;max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;"></div>
+    </div>
+
+    <!-- Panel dormidos integrado -->
+    <div id="seg-panel-dormidos" style="display:none;">
+      <div style="font-size:12.5px;color:var(--text3);margin-bottom:14px;">
+        Clientes <strong>⭐ Recurrente</strong> que llevan más de 90 días sin hacer un pedido. ¡Es hora de llamarles!
+      </div>
+      <div class="dormidos-list" id="seg-dormidos-list" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+
+    <div class="modal-footer" style="margin-top:14px;">
+      <button class="btn-cancel" onclick="cerrarModal('modal-seguimiento')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-bg" id="modal-cuota-detalle">
+  <div class="modal-box" style="max-width:600px;">
+    <div class="modal-title">📦 Pedidos del mes actual</div>
+    <div id="cuota-detalle-content" style="max-height:60vh;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-cuota-detalle')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- BOTÓN FLOTANTE NOTA RÁPIDA -->
+<button id="btn-nota-rapida" onclick="abrirNotaRapida()" title="Nota rápida" style="position:fixed;bottom:24px;right:24px;z-index:9999;width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;transition:transform .15s ease;" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'">✏️</button>
+
+<!-- MODAL NOTA RÁPIDA -->
+<div class="modal-bg" id="modal-nota-rapida">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-title">✏️ Nota rápida</div>
+    <div class="form-group" style="margin-bottom:10px;">
+      <label style="font-size:12px;color:var(--text3);">Cliente</label>
+      <input id="nr-buscar" class="form-input" type="text" placeholder="Escribe el nombre del cliente..." oninput="buscarClienteNR()" autocomplete="off" style="margin-bottom:4px;">
+      <div id="nr-sugerencias" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.12);"></div>
+      <input id="nr-cliente-id" type="hidden" value="">
+      <div id="nr-cliente-sel" style="display:none;padding:6px 10px;background:rgba(99,102,241,0.08);border-radius:6px;font-size:12px;font-weight:600;color:var(--accent);margin-top:4px;"></div>
+    </div>
+    <div class="form-group">
+      <label style="font-size:12px;color:var(--text3);">Nota</label>
+      <textarea id="nr-texto" class="form-input" rows="4" placeholder="Apunta lo que necesites..." maxlength="500" oninput="document.getElementById('nr-counter').textContent=this.value.length+'/500'" style="resize:vertical;"></textarea>
+      <div id="nr-counter" style="font-size:10px;color:var(--text3);text-align:right;margin-top:2px;">0/500</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-nota-rapida')">Cancelar</button>
+      <button class="btn-save" id="nr-btn-guardar" onclick="guardarNotaRapida()">💾 Guardar nota</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modal-kanban">
+  <div class="modal-box wide" style="max-width:98%;max-height:95vh;height:95vh;overflow-y:hidden;display:flex;flex-direction:column;background:var(--bg);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div class="modal-title" style="margin:0;border:none;padding:0;">📋 Tablero Kanban</div>
+      <button class="btn-cancel" onclick="cerrarModal('modal-kanban')" style="margin:0;">✕ Cerrar</button>
+    </div>
+    <div id="kanban-board" class="kanban-container" style="flex:1;display:flex;gap:12px;padding:15px;overflow-x:auto;overflow-y:hidden;align-items:stretch;">
+      <!-- Las columnas se inyectarán aquí -->
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL HERRAMIENTAS ═══ -->
+<div class="modal-bg" id="modal-herramientas">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="modal-title">⚙️ Herramientas</div>
+
+    <div class="herr-section-title">📊 Análisis</div>
+    <div class="herr-grid">
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirDashboard()">📊<span>Dashboard</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirModalInforme()">📋<span>Informe</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirKanban()">🗂️<span>Pipeline</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirCalendarioGlobal()">📅<span>Calendario</span></button>
+    </div>
+
+    <div class="herr-section-title">⚡ Operaciones</div>
+    <div class="herr-grid">
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirSeguimiento()">🔔<span>Seguimiento</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirPlantillas()">💬<span>Plantillas</span></button>
+      <button id="herr-btn-google" class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirGoogle()">🔗<span>Google</span></button>
+    </div>
+
+    <div class="herr-section-title">💾 Datos</div>
+    <div class="herr-grid">
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');document.getElementById('archivo-csv').click()">📤<span>Importar</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');exportarCSV()">📥<span>Exportar</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');exportarClientesExcel()">👥<span>Clientes XLS</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');exportarExcel()">📊<span>Pedidos XLS</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');exportarInformePDF()">🖨️<span>PDF</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');exportarICal()">📅<span>iCal</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');backupJSON()">💾<span>Backup</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');guardarArchivo()">🗄️<span>Copia JSON</span></button>
+      <button class="herr-btn" onclick="cerrarModal('modal-herramientas');abrirPapelera()">🗑️<span>Papelera</span></button>
+    </div>
+
+    <div class="modal-footer" style="margin-top:16px;">
+      <button class="btn-cancel" onclick="cerrarModal('modal-herramientas')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL CALENDARIO GLOBAL ═══ -->
+<div class="modal-bg" id="modal-cal-global">
+  <div class="modal-box" style="max-width:800px;width:95vw;padding:22px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <button onclick="navCalGlobal(-1)" class="cal-nav-btn">‹</button>
+      <div id="cal-global-titulo" style="font-size:18px;font-weight:800;color:var(--text);text-transform:capitalize;"></div>
+      <button onclick="navCalGlobal(1)" class="cal-nav-btn">›</button>
+    </div>
+    <div id="cal-global-leyenda" style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+      <span class="cal-badge cal-badge-visita" style="padding:3px 10px;">📍 Visita</span>
+      <span class="cal-badge cal-badge-llamada" style="padding:3px 10px;">📞 Llamada programada</span>
+      <span class="cal-badge cal-badge-rec" style="padding:3px 10px;">🔔 Recordatorio</span>
+    </div>
+    <div id="cal-global-grid" class="cal-global-grid"></div>
+    <div class="modal-footer" style="margin-top:16px;">
+      <button class="btn-cancel" onclick="cerrarModal('modal-cal-global')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- ═══ PANEL DASHBOARD MÉTRICAS ═══ -->
+
+
+<div class="modal-bg" id="modal-replan">
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-title" id="replan-titulo">📅 Replanificar</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nueva fecha *</label>
+        <input class="form-input" id="replan-fecha" type="date">
+      </div>
+      <div class="form-group" id="replan-hora-wrap">
+        <label>Nueva hora de inicio</label>
+        <input class="form-input" id="replan-hora" type="time">
+      </div>
+    </div>
+    <input type="hidden" id="replan-tipo">
+    <input type="hidden" id="replan-idx">
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="cerrarModal('modal-replan')">Cancelar</button>
+      <button class="btn-save" onclick="guardarReplan()">💾 Guardar cambio</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
