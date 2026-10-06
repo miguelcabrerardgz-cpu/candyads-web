@@ -40,7 +40,7 @@
     marco.setAttribute('referrerpolicy', 'no-referrer');
     // Portapapeles: los botones «Copiar» del CRM (informes, plantillas) lo necesitan dentro del marco.
     marco.setAttribute('allow', 'clipboard-write');
-    marco.src = '/crm/index.html?v=1';
+    marco.src = '/crm/index.html?v=3';
     cont.append(barra, marco);
 
     pintarEstado = function (txt, tipo) {
@@ -51,7 +51,7 @@
     recargar.addEventListener('click', function () {
       if (hayPendientes() && !conflicto && !confirm('Hay cambios guardándose todavía. ¿Recargar igualmente?')) return;
       conflicto = false; pendientes = {}; recargar.style.display = 'none';
-      marco.src = '/crm/index.html?v=1&r=' + Date.now();
+      marco.src = '/crm/index.html?v=3&r=' + Date.now();
     });
 
     var puerto = null;
@@ -93,8 +93,125 @@
         .catch(function (e) { pintarEstado(e.message, 'mal'); });
     }
 
+    // ---------- Peticiones del CRM (vía CRM_PUENTE en puente.js) ----------
+    // El CRM no tiene red: lo que necesita de Supabase se lo da el panel, que valida todo lo que recibe.
+
+    function responder(tipo, datos) { if (puerto) puerto.postMessage({ tipo: tipo, datos: datos }); }
+    function entero(v) { return Number.isInteger(v) && v > 0 ? v : null; }
+    function json(r) {
+      if (r.status === 401) { ctx.sesionCaducada(); throw new Error('sesión'); }
+      if (!r.ok) throw new Error('No se pudieron leer los datos.');
+      return r.json();
+    }
+    function texto(v, max) { var s = v == null ? '' : String(v).trim(); return s ? s.slice(0, max || 120) : null; }
+
+    // Leads y ventas de todas las campañas asociadas a un cliente del CRM (solo cifras, ningún dato de leads).
+    function trazabilidad(d) {
+      var id = entero(d.clienteId);
+      if (!id) return;
+      ctx.api('/rest/v1/anunciantes_destino?select=slug,nombre_mostrado,estado&crm_cliente_id=eq.' + id + '&order=nombre_mostrado.asc')
+        .then(json)
+        .then(function (camps) {
+          if (!camps.length) { responder('trazabilidad', { clienteId: id, campanas: [], meses: [] }); return; }
+          // Los slugs ya vienen validados por la base de datos (solo [a-z0-9-]).
+          var lista = camps.map(function (c) { return c.slug; }).join(',');
+          return Promise.all([
+            ctx.api('/rest/v1/leads_count?select=anunciante_slug,fecha,total&anunciante_slug=in.(' + lista + ')&limit=20000').then(json),
+            ctx.api('/rest/v1/leads_registro?select=anunciante_slug,conversion,recibido_at&anunciante_slug=in.(' + lista + ')&limit=50000').then(json)
+          ]).then(function (rs) { responder('trazabilidad', resumir(id, camps, rs[0], rs[1])); });
+        })
+        .catch(function (e) {
+          if (e.message !== 'sesión') responder('trazabilidad', { clienteId: id, error: 'No se pudieron leer los datos de sus campañas.' });
+        });
+    }
+
+    function resumir(id, camps, conteos, registros) {
+      var hoy = new Date(), meses = [], idx = {};
+      for (var i = 11; i >= 0; i--) {
+        var m = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+        var k = m.getFullYear() + '-' + String(m.getMonth() + 1).padStart(2, '0');
+        idx[k] = meses.length;
+        meses.push({ mes: k, leads: 0, ventas: 0 });
+      }
+      var porSlug = {};
+      camps.forEach(function (c) {
+        porSlug[c.slug] = { slug: c.slug, nombre: c.nombre_mostrado || c.slug, estado: c.estado, leads: 0, ventas: 0, sinVenta: 0, pendientes: 0 };
+      });
+      conteos.forEach(function (r) {
+        var c = porSlug[r.anunciante_slug];
+        if (c) c.leads += r.total;
+        var k = String(r.fecha).slice(0, 7);
+        if (k in idx) meses[idx[k]].leads += r.total;
+      });
+      registros.forEach(function (r) {
+        var c = porSlug[r.anunciante_slug];
+        if (!c) return;
+        if (r.conversion === 'venta') {
+          c.ventas++;
+          var k = String(r.recibido_at).slice(0, 7);
+          if (k in idx) meses[idx[k]].ventas++;
+        } else if (r.conversion === 'sin_venta') c.sinVenta++;
+        else c.pendientes++;
+      });
+      return { clienteId: id, campanas: camps.map(function (c) { return porSlug[c.slug]; }), meses: meses };
+    }
+
+    function slugify(t) {
+      var s = (t || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 55);
+      return s.replace(/-+$/, '');
+    }
+
+    // Presupuesto aceptado en el CRM → campaña en borrador con los datos del cliente. Se confirma aquí, en
+    // el panel (no en el marco del CRM), mostrando a qué email llegarán los leads.
+    function crearCampana(d) {
+      var id = entero(d.clienteId), c = d.cliente || {}, ref = texto(d.ref, 40) || '';
+      function fallo(msg) { responder('campana-error', { ref: ref, clienteId: id, mensaje: msg }); }
+      if (!id || !texto(c.nombre)) { fallo('Faltan datos del cliente.'); return; }
+      var email = texto(c.email, 200) || '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        fallo('El cliente no tiene un email válido. Añádelo en su ficha del CRM (es donde llegarán los leads) y vuelve a pulsar.');
+        return;
+      }
+      ctx.api('/rest/v1/anunciantes_destino?select=slug,crm_cliente_id').then(json).then(function (todas) {
+        var suyas = todas.filter(function (x) { return x.crm_cliente_id === id; }).length;
+        if (!confirm('Presupuesto ' + ref + ' aceptado por «' + texto(c.nombre) + '».\n\n¿Crear su campaña?\n\n' +
+          '• Nace en BORRADOR: el QR no recibirá contactos hasta que la lances.\n' +
+          '• Los leads llegarán a: ' + email + '\n' +
+          (suyas ? '• Ojo: este cliente ya tiene ' + suyas + ' campaña(s).\n' : '') +
+          '\nDespués revisa en su ficha el logo, los datos legales y los campos del formulario.')) {
+          fallo('cancelado');
+          return;
+        }
+        var usados = {};
+        todas.forEach(function (x) { usados[x.slug] = true; });
+        var base = slugify(c.nombre) || 'campana', slug = base, n = 2;
+        while (usados[slug]) { slug = base + '-' + n; n++; }
+        var CF = window.CandyFormulario;
+        var fila = {
+          slug: slug, nombre_mostrado: texto(c.nombre), estado: 'borrador', email_destino: email, limite_diario: 100,
+          cif: texto(c.cif, 20), sector: texto(c.sector), zona: texto([c.municipio, c.provincia].filter(Boolean).join(', ')),
+          crm_cliente_id: id, campos_formulario: CF.COMUNES.map(CF.copia), campos: ['nombre', 'telefono', 'email']
+        };
+        return ctx.api('/rest/v1/anunciantes_destino', {
+          method: 'POST', body: JSON.stringify(fila), headers: { Prefer: 'return=representation' }
+        }).then(function (r) {
+          if (r.status === 401) { ctx.sesionCaducada(); throw new Error('sesión'); }
+          if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) { throw new Error((b && b.message) || 'No se pudo crear la campaña.'); });
+          responder('campana-creada', { ref: ref, clienteId: id, slug: slug });
+        });
+      }).catch(function (e) { if (e.message !== 'sesión') fallo(e.message); });
+    }
+
     function recibir(m) {
       if (m.tipo === 'arrancado') { pintarEstado('Todo guardado', 'ok'); return; }
+      if (m.tipo === 'pedir-trazabilidad') { trazabilidad(m.datos || {}); return; }
+      if (m.tipo === 'crear-campana') { crearCampana(m.datos || {}); return; }
+      if (m.tipo === 'abrir-campana') {
+        var s = (m.datos || {}).slug;
+        if (typeof s === 'string' && /^[a-z0-9][a-z0-9-]{0,60}$/.test(s)) ctx.irA('campanas', s);
+        return;
+      }
       if (conflicto) return;
       if (m.tipo === 'guardar' && typeof m.clave === 'string' && typeof m.valor === 'string') {
         if (m.valor.length > MAX_VALOR) { pintarEstado('Demasiado grande para guardar (máx. 8 MB por bloque). Quita algún PDF.', 'mal'); return; }

@@ -1145,7 +1145,7 @@ function renderPresupuestosHist(cl) {
                       minimumFractionDigits: 2,
                     }) + " €"
                   : "—") +
-                '</td><td style="padding:5px 8px;white-space:nowrap;"><button onclick="reimprimirPresupuesto(' + i + ')" title="Ver / imprimir" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;margin-right:4px;">📄</button><button onclick="borrarPresupuestoHist(' +
+                '</td><td style="padding:5px 8px;white-space:nowrap;">' + botonAceptarPresupuesto(p, i) + '<button onclick="reimprimirPresupuesto(' + i + ')" title="Ver / imprimir" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;margin-right:4px;">📄</button><button onclick="borrarPresupuestoHist(' +
                 i +
                 ')" style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid rgba(239,68,68,0.3);background:transparent;color:#ef4444;cursor:pointer;">✕</button></td></tr>'
               );
@@ -1317,7 +1317,7 @@ function renderPerfil() {
   ((area.innerHTML = `\n    \n    <div style="">\n    <div class="profile-header" style="margin-top:12px;">\n      <div class="profile-header-top">\n        <div>\n          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px;">\n            <div class="company-name" style="margin-bottom:0;">${esc(c.nombre)}</div>\n            ${(() => {
     const e = getEtqInfo(c);
     return `<span class="etq-pill ${e.cls}">${esc(e.label)}</span>`;
-  })()}\n          </div>\n          <div class="contact-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">\n            <span>👤 <span style="background:rgba(124,58,237,0.10);color:var(--accent);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:500;">${esc(c.contacto) || "Sin contacto"}</span></span>\n            <span class="temp-badge ${getTemperatura(c).css}">${getTemperatura(c).label}${getTemperatura(c).dias !== 1 / 0 ? " · " + getTemperatura(c).dias + "d" : ""}</span>\n          </div>\n          <div class="profile-meta">\n            ${c.telefono ? `<div class="meta-chip"><span class="ico">&#128241;</span>${c.telefono}</div>` : ""}\n            ${c.telefonoFijo ? `<div class="meta-chip"><span class="ico">&#9742;&#65039;</span>${c.telefonoFijo}</div>` : ""}\n            ${waLink}\n            ${c.email ? `<div class="meta-chip" style="cursor:pointer;" onclick="window.open('mailto:${c.email}?body=${encodeURIComponent("Hola, solicito presupuesto para: ")}','_blank')" title="Enviar email"><span class="ico">✉️</span><u>${c.email}</u></div>` : ""}\n            ${mapsLink}\n            ${c.provincia ? `<div class="meta-chip"><span class="ico">🗺️</span>${c.provincia}</div>` : ""}\n            ${c.sector ? `<div class="meta-chip"><span class="ico">📦</span>${c.sector}</div>` : ""}\n          </div>\n        </div>\n        <div class="header-actions">\n          <button class="btn-edit" onclick="abrirPlantillas()" style="background:rgba(37,211,102,0.10);color:#16a34a;border:1px solid rgba(37,211,102,0.3);">💬 Plantillas</button>\n          <button class="btn-edit" onclick="abrirModalCliente(true)">✏️ Editar</button>\n          <button class="btn-del-client" onclick="eliminarCliente()">🗑️ Eliminar</button>\n        </div>\n      </div>\n    </div>\n<!-- RESUMEN FINANCIERO -->\n    <div class="fin-summary" style="padding:0 32px 4px;">\n      <div class="fin-card">\n        <div class="fin-label">Total facturado</div>\n        <div class="fin-value total">${fmt(fin.total)} €</div>\n        <div class="fin-sub">${fin.nPedidos} pedido${1 !== fin.nPedidos ? "s" : ""}</div>\n      </div>\n      <div class="fin-card">\n        <div class="fin-label">Pendiente de cobro</div>\n        <div class="fin-value pendiente">${fmt(fin.pendiente)} €</div>\n        <div class="fin-sub">${c.pedidos.filter((p) => "Pagado" !== p.estado).length} sin cobrar</div>\n      </div>\n      <div class="fin-card">\n        <div class="fin-label">Total pagado</div>\n        <div class="fin-value pagado">${fmt(fin.pagado)} €</div>\n        <div class="fin-sub">${c.pedidos.filter((p) => "Pagado" === p.estado).length} cobrados</div>\n      </div>\n    </div>\n\n    \n\n    <div class="content-area">\n      <div class="grid-2">\n        <div class="card">\n          <div class="card-title green">Llamadas</div>\n          <textarea class="inner-textarea" id="nueva-llamada" rows="2" placeholder="Resumen de la llamada..."></textarea>\n          <div style="display:flex;gap:6px;margin-top:6px;">\n            <button class="btn-add btn-add-green" onclick="addActivity('llamada')" style="flex:1;">+ Registrar llamada</button>\n            <button class="btn-add" onclick="abrirPlanificar('llamada')" style="flex:1;background:rgba(34,197,94,0.07);color:#16a34a;border:1px solid rgba(34,197,94,0.3);">Planificar llamada</button>\n          </div>\n          <div class="activity-list">${fmtActivity(c.llamadas, "llamada")}</div>\n        </div>\n        <div class="card">\n          <div class="card-title blue">Visitas</div>\n          <div style="display:flex;gap:6px;margin-bottom:4px;">\n            <button class="btn-add btn-add-blue" onclick="abrirModalVisita()" style="flex:1;">Registrar visita</button>\n            <button class="btn-add" onclick="abrirPlanificar('visita')" style="flex:1;background:rgba(59,130,246,0.07);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);">Planificar visita</button>\n          </div>\n          <div class="activity-list">${fmtActivity(c.visitas, "visita")}</div>\n        </div>\n      </div>\n\n      <div class="grid-2">\n        <div class="card">\n          <div class="card-title yellow">Notas generales</div>\n          <textarea class="inner-textarea" id="nueva-nota" rows="2" placeholder="Añade un apunte..."></textarea>\n          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">\n            <button class="btn-add btn-add-gray" onclick="addActivity('nota')" style="flex:1;">+ Añadir nota</button>\n            \n          </div>\n          <div class="activity-list">${fmtActivityNotas(c.notas)}</div>\n        </div>\n        <!-- HISTÓRICO DE OFERTAS (columna derecha del grid) -->\n        <div class="card">\n          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">\n            <div class="card-title" style="margin-bottom:0;padding-bottom:0;border:none;display:flex;align-items:center;gap:8px;">\n              <span style="display:inline-block;width:4px;height:18px;border-radius:2px;background:#f59e0b;"></span>\n              💼 Histórico de Ofertas\n            </div>\n            \n            <button class="btn-add" onclick="abrirModalPresupuesto()" style="margin:0;padding:5px 12px;font-size:12px;background:rgba(99,102,241,0.09);color:#6366f1;border:1px solid rgba(99,102,241,0.3);">Nuevo presupuesto</button>\n          </div>\n          <div id="lista-ofertas" style="display:flex;flex-direction:column;gap:8px;">\n            ${renderDocsList(c.id, "oferta")}\n          </div>\n        </div>\n      </div>\n\n      <div class="card" id="card-presupuestos-hist" style="display:none;">\n        <div class="card-title" style="margin-bottom:10px;color:#8b5cf6;">📄 Presupuestos enviados</div>\n        <div id="lista-presupuestos-hist"></div>\n      </div>\n      <div class="card">\n        <div class="card-title red" style="margin-bottom:12px;">Historial de Pedidos / Ofertas</div>\n        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">\n          <button class="btn-add btn-add-blue" onclick="abrirModalPedido()" style="flex:1;">Nuevo pedido</button>\n          <button class="btn-add" onclick="abrirModalPresupuesto()" style="flex:1;background:rgba(99,102,241,0.09);color:#6366f1;border:1px solid rgba(99,102,241,0.3);">Nuevo presupuesto</button>\n        </div>\n        <div class="table-wrap">\n          <table>\n            <thead><tr><th>Nº pedido</th><th>Empresa</th><th>CIF</th><th>Concepto</th><th>Cant.</th><th>Precio ud.</th><th>Fecha</th><th>Entrega</th><th>Importe</th><th>Estado</th><th>Notas</th><th></th><th></th></tr></thead>\n            <tbody>${pedRows}</tbody>\n          </table>\n        </div>\n      </div>\n\n      <!-- FICHAS TÉCNICAS -->\n      <div class="card" style="margin-top:16px;">\n        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">\n          <div class="card-title" style="margin-bottom:0;padding-bottom:0;border:none;display:flex;align-items:center;gap:8px;">\n            <span style="display:inline-block;width:4px;height:18px;border-radius:2px;background:#8b5cf6;"></span>\n            📐 Fichas Técnicas\n          </div>\n          \n        </div>\n        <div id="lista-fichas" style="display:flex;flex-direction:column;gap:8px;">\n          ${renderDocsList(c.id, "ficha")}\n        </div>\n      </div>\n\n      <!-- RECORDATORIOS -->\n      <div class="card" style="margin-top:16px;">\n        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">\n          <div class="card-title purple" style="margin-bottom:0;">Recordatorios</div>\n          <button class="btn-add btn-add-purple" onclick="abrirModal('modal-recordatorio')" style="margin:0;padding:5px 14px;font-size:12px;">🔔 Añadir recordatorio</button>\n        </div>\n        <div class="activity-list" style="margin-top:10px;">${recsHtml}</div>\n      </div>\n\n    <div style="margin-top:24px;padding:0 0 16px;">\n  <div id="historial-acciones-cont">\n    <p style="color:var(--text3);font-size:12px;">Cargando historial...</p>\n  </div>\n</div>\n\n    </div>`),
+  })()}\n          </div>\n          <div class="contact-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">\n            <span>👤 <span style="background:rgba(124,58,237,0.10);color:var(--accent);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:500;">${esc(c.contacto) || "Sin contacto"}</span></span>\n            <span class="temp-badge ${getTemperatura(c).css}">${getTemperatura(c).label}${getTemperatura(c).dias !== 1 / 0 ? " · " + getTemperatura(c).dias + "d" : ""}</span>\n          </div>\n          <div class="profile-meta">\n            ${c.telefono ? `<div class="meta-chip"><span class="ico">&#128241;</span>${c.telefono}</div>` : ""}\n            ${c.telefonoFijo ? `<div class="meta-chip"><span class="ico">&#9742;&#65039;</span>${c.telefonoFijo}</div>` : ""}\n            ${waLink}\n            ${c.email ? `<div class="meta-chip" style="cursor:pointer;" onclick="window.open('mailto:${c.email}?body=${encodeURIComponent("Hola, solicito presupuesto para: ")}','_blank')" title="Enviar email"><span class="ico">✉️</span><u>${c.email}</u></div>` : ""}\n            ${mapsLink}\n            ${c.provincia ? `<div class="meta-chip"><span class="ico">🗺️</span>${c.provincia}</div>` : ""}\n            ${c.sector ? `<div class="meta-chip"><span class="ico">📦</span>${c.sector}</div>` : ""}\n          </div>\n        </div>\n        <div class="header-actions">\n          <button class="btn-edit" onclick="abrirPlantillas()" style="background:rgba(37,211,102,0.10);color:#16a34a;border:1px solid rgba(37,211,102,0.3);">💬 Plantillas</button>\n          <button class="btn-edit" onclick="abrirModalCliente(true)">✏️ Editar</button>\n          <button class="btn-del-client" onclick="eliminarCliente()">🗑️ Eliminar</button>\n        </div>\n      </div>\n    </div>\n<!-- RESUMEN FINANCIERO -->\n    <div class="fin-summary" style="padding:0 32px 4px;">\n      <div class="fin-card">\n        <div class="fin-label">Total facturado</div>\n        <div class="fin-value total">${fmt(fin.total)} €</div>\n        <div class="fin-sub">${fin.nPedidos} pedido${1 !== fin.nPedidos ? "s" : ""}</div>\n      </div>\n      <div class="fin-card">\n        <div class="fin-label">Pendiente de cobro</div>\n        <div class="fin-value pendiente">${fmt(fin.pendiente)} €</div>\n        <div class="fin-sub">${c.pedidos.filter((p) => "Pagado" !== p.estado).length} sin cobrar</div>\n      </div>\n      <div class="fin-card">\n        <div class="fin-label">Total pagado</div>\n        <div class="fin-value pagado">${fmt(fin.pagado)} €</div>\n        <div class="fin-sub">${c.pedidos.filter((p) => "Pagado" === p.estado).length} cobrados</div>\n      </div>\n    </div>\n\n    \n\n    <div class="content-area">\n      <div class="card" id="card-campanas-cliente" style="margin-bottom:16px;">\n        <div class="card-title" style="margin-bottom:12px;color:var(--accent);">📈 Campañas y leads</div>\n        <div id="campanas-cliente-cuerpo"><p style="color:var(--text3);font-size:12.5px;">Cargando sus campañas…</p></div>\n      </div>\n      <div class="grid-2">\n        <div class="card">\n          <div class="card-title green">Llamadas</div>\n          <textarea class="inner-textarea" id="nueva-llamada" rows="2" placeholder="Resumen de la llamada..."></textarea>\n          <div style="display:flex;gap:6px;margin-top:6px;">\n            <button class="btn-add btn-add-green" onclick="addActivity('llamada')" style="flex:1;">+ Registrar llamada</button>\n            <button class="btn-add" onclick="abrirPlanificar('llamada')" style="flex:1;background:rgba(34,197,94,0.07);color:#16a34a;border:1px solid rgba(34,197,94,0.3);">Planificar llamada</button>\n          </div>\n          <div class="activity-list">${fmtActivity(c.llamadas, "llamada")}</div>\n        </div>\n        <div class="card">\n          <div class="card-title blue">Visitas</div>\n          <div style="display:flex;gap:6px;margin-bottom:4px;">\n            <button class="btn-add btn-add-blue" onclick="abrirModalVisita()" style="flex:1;">Registrar visita</button>\n            <button class="btn-add" onclick="abrirPlanificar('visita')" style="flex:1;background:rgba(59,130,246,0.07);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);">Planificar visita</button>\n          </div>\n          <div class="activity-list">${fmtActivity(c.visitas, "visita")}</div>\n        </div>\n      </div>\n\n      <div class="grid-2">\n        <div class="card">\n          <div class="card-title yellow">Notas generales</div>\n          <textarea class="inner-textarea" id="nueva-nota" rows="2" placeholder="Añade un apunte..."></textarea>\n          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">\n            <button class="btn-add btn-add-gray" onclick="addActivity('nota')" style="flex:1;">+ Añadir nota</button>\n            \n          </div>\n          <div class="activity-list">${fmtActivityNotas(c.notas)}</div>\n        </div>\n        <!-- HISTÓRICO DE OFERTAS (columna derecha del grid) -->\n        <div class="card">\n          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">\n            <div class="card-title" style="margin-bottom:0;padding-bottom:0;border:none;display:flex;align-items:center;gap:8px;">\n              <span style="display:inline-block;width:4px;height:18px;border-radius:2px;background:#f59e0b;"></span>\n              💼 Histórico de Ofertas\n            </div>\n            \n            <button class="btn-add" onclick="abrirModalPresupuesto()" style="margin:0;padding:5px 12px;font-size:12px;background:rgba(99,102,241,0.09);color:#6366f1;border:1px solid rgba(99,102,241,0.3);">Nuevo presupuesto</button>\n          </div>\n          <div id="lista-ofertas" style="display:flex;flex-direction:column;gap:8px;">\n            ${renderDocsList(c.id, "oferta")}\n          </div>\n        </div>\n      </div>\n\n      <div class="card" id="card-presupuestos-hist" style="display:none;">\n        <div class="card-title" style="margin-bottom:10px;color:#8b5cf6;">📄 Presupuestos enviados</div>\n        <div id="lista-presupuestos-hist"></div>\n      </div>\n      <div class="card">\n        <div class="card-title red" style="margin-bottom:12px;">Historial de Pedidos / Ofertas</div>\n        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">\n          <button class="btn-add btn-add-blue" onclick="abrirModalPedido()" style="flex:1;">Nuevo pedido</button>\n          <button class="btn-add" onclick="abrirModalPresupuesto()" style="flex:1;background:rgba(99,102,241,0.09);color:#6366f1;border:1px solid rgba(99,102,241,0.3);">Nuevo presupuesto</button>\n        </div>\n        <div class="table-wrap">\n          <table>\n            <thead><tr><th>Nº pedido</th><th>Empresa</th><th>CIF</th><th>Concepto</th><th>Cant.</th><th>Precio ud.</th><th>Fecha</th><th>Entrega</th><th>Importe</th><th>Estado</th><th>Notas</th><th></th><th></th></tr></thead>\n            <tbody>${pedRows}</tbody>\n          </table>\n        </div>\n      </div>\n\n      <!-- FICHAS TÉCNICAS -->\n      <div class="card" style="margin-top:16px;">\n        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">\n          <div class="card-title" style="margin-bottom:0;padding-bottom:0;border:none;display:flex;align-items:center;gap:8px;">\n            <span style="display:inline-block;width:4px;height:18px;border-radius:2px;background:#8b5cf6;"></span>\n            📐 Fichas Técnicas\n          </div>\n          \n        </div>\n        <div id="lista-fichas" style="display:flex;flex-direction:column;gap:8px;">\n          ${renderDocsList(c.id, "ficha")}\n        </div>\n      </div>\n\n      <!-- RECORDATORIOS -->\n      <div class="card" style="margin-top:16px;">\n        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">\n          <div class="card-title purple" style="margin-bottom:0;">Recordatorios</div>\n          <button class="btn-add btn-add-purple" onclick="abrirModal('modal-recordatorio')" style="margin:0;padding:5px 14px;font-size:12px;">🔔 Añadir recordatorio</button>\n        </div>\n        <div class="activity-list" style="margin-top:10px;">${recsHtml}</div>\n      </div>\n\n    <div style="margin-top:24px;padding:0 0 16px;">\n  <div id="historial-acciones-cont">\n    <p style="color:var(--text3);font-size:12px;">Cargando historial...</p>\n  </div>\n</div>\n\n    </div>`),
     c && renderPresupuestosHist(c));
   if (typeof cargarHistorialAcciones === 'function') {
     cargarHistorialAcciones(activeId);
@@ -6616,3 +6616,164 @@ function _crmNotificarHost(data, ts) {
   if (b)
     b.innerHTML = logoCandy(40);
 })();
+
+/* ══ Candy Ads: campañas del cliente y presupuesto aceptado → campaña ══════════════════════════════════
+   Este marco no tiene red: los datos de las campañas (solo cifras de leads y ventas, nunca datos de las
+   personas) y la creación de la campaña los hace el panel, por CRM_PUENTE (puente.js). La asociación
+   campaña ↔ cliente es anunciantes_destino.crm_cliente_id = id del cliente en este CRM. */
+var chartCampanasCliente = null;
+var ESTADO_CAMPANA = {
+  borrador: ["Borrador", "rgba(29,78,216,0.10)", "#1D4ED8"],
+  activa: ["Activa", "rgba(4,120,87,0.12)", "#047857"],
+  pausada: ["Pausada", "#FFFBEB", "#B45309"],
+  finalizada: ["Finalizada", "rgba(107,107,128,0.14)", "#6B6B80"],
+};
+
+function pedirCampanasCliente() {
+  var c = activeId && db.find((x) => x.id === activeId);
+  if (!c || !document.getElementById("campanas-cliente-cuerpo")) return;
+  CRM_PUENTE.enviar("pedir-trazabilidad", { clienteId: c.id });
+}
+(function () {
+  // Cada vez que se pinta la ficha de un cliente, se piden las cifras de sus campañas.
+  var renderPerfilBase = renderPerfil;
+  renderPerfil = function () {
+    var r = renderPerfilBase.apply(this, arguments);
+    pedirCampanasCliente();
+    return r;
+  };
+})();
+
+function abrirCampanaPanel(slug) {
+  if (/^[a-z0-9][a-z0-9-]{0,60}$/.test(slug || "")) CRM_PUENTE.enviar("abrir-campana", { slug: slug });
+}
+
+function pctConversion(ventas, sinVenta) {
+  var resp = ventas + sinVenta;
+  return resp ? Math.round((ventas / resp) * 100) + "%" : "—";
+}
+
+CRM_PUENTE.en("trazabilidad", function (d) {
+  var cont = document.getElementById("campanas-cliente-cuerpo");
+  if (!cont || d.clienteId !== activeId) return;
+  if (chartCampanasCliente) { chartCampanasCliente.destroy(); chartCampanasCliente = null; }
+  if (d.error) {
+    cont.innerHTML = '<p style="color:#dc2626;font-size:12.5px;">' + esc(d.error) + "</p>";
+    return;
+  }
+  var camps = d.campanas || [];
+  if (!camps.length) {
+    cont.innerHTML =
+      '<p style="color:var(--text3);font-size:12.5px;line-height:1.5;">Este cliente todavía no tiene campañas. Se crean al marcar ' +
+      "un presupuesto como <b>✅ Aceptado</b> en «Presupuestos enviados», o asociándolo desde la ficha de una campaña " +
+      "(pestaña Campañas del panel).</p>";
+    return;
+  }
+  var tot = camps.reduce(
+    (a, c) => ({ leads: a.leads + c.leads, ventas: a.ventas + c.ventas, sinVenta: a.sinVenta + c.sinVenta, pendientes: a.pendientes + c.pendientes }),
+    { leads: 0, ventas: 0, sinVenta: 0, pendientes: 0 },
+  );
+  var activas = camps.filter((c) => c.estado === "activa").length;
+  function cifra(valor, etiqueta, color) {
+    return '<div style="flex:1;min-width:110px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);">' +
+      '<div style="font-size:20px;font-weight:700;color:' + (color || "var(--text)") + ';">' + valor + "</div>" +
+      '<div style="font-size:11px;color:var(--text3);margin-top:2px;">' + etiqueta + "</div></div>";
+  }
+  var filas = camps
+    .map(function (c) {
+      var e = ESTADO_CAMPANA[c.estado] || [esc(c.estado), "var(--surface2)", "var(--text2)"];
+      return '<tr style="border-bottom:1px solid var(--border);">' +
+        '<td style="padding:7px 8px;"><button onclick="abrirCampanaPanel(\'' + esc(c.slug) + '\')" title="Abrir la campaña en el panel" ' +
+        'style="background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--accent);cursor:pointer;text-decoration:underline;">' + esc(c.nombre) + "</button></td>" +
+        '<td style="padding:7px 8px;"><span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:' + e[1] + ";color:" + e[2] + ';">' + e[0] + "</span></td>" +
+        '<td style="padding:7px 8px;text-align:right;font-weight:700;">' + c.leads + "</td>" +
+        '<td style="padding:7px 8px;text-align:right;color:#047857;font-weight:700;">' + c.ventas + "</td>" +
+        '<td style="padding:7px 8px;text-align:right;color:var(--text2);">' + c.sinVenta + "</td>" +
+        '<td style="padding:7px 8px;text-align:right;color:var(--text3);">' + c.pendientes + "</td>" +
+        '<td style="padding:7px 8px;text-align:right;font-weight:700;">' + pctConversion(c.ventas, c.sinVenta) + "</td></tr>";
+    })
+    .join("");
+  cont.innerHTML =
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">' +
+    cifra(tot.leads, "Leads recibidos") +
+    cifra(tot.ventas, "Ventas confirmadas", "#047857") +
+    cifra(pctConversion(tot.ventas, tot.sinVenta), "Conversión (de las respondidas)", "var(--accent)") +
+    cifra(camps.length + (activas ? " · " + activas + " activa" + (activas > 1 ? "s" : "") : ""), "Campañas") +
+    "</div>" +
+    '<div style="position:relative;height:210px;margin-bottom:14px;"><canvas id="chart-campanas-cliente"></canvas></div>' +
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:rgba(124,58,237,0.06);">' +
+    ["Campaña", "Estado", "Leads", "Ventas", "Sin venta", "Pendientes", "Conversión"]
+      .map((h, i) => '<th style="padding:6px 8px;text-align:' + (i < 2 ? "left" : "right") + ';font-size:11px;color:var(--text3);font-weight:700;">' + h + "</th>")
+      .join("") +
+    "</tr></thead><tbody>" + filas + "</tbody></table></div>" +
+    '<p style="color:var(--text3);font-size:11px;margin-top:8px;">Ventas = leads que el anunciante confirmó como venta desde su correo. ' +
+    "Conversión = ventas entre los leads ya respondidos (venta o sin venta). Gráfico: últimos 12 meses.</p>";
+  var lienzo = document.getElementById("chart-campanas-cliente");
+  if (lienzo && typeof Chart !== "undefined") {
+    var MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    var meses = d.meses || [];
+    chartCampanasCliente = new Chart(lienzo, {
+      type: "bar",
+      data: {
+        labels: meses.map((m) => MESES[parseInt(m.mes.slice(5), 10) - 1] + " " + m.mes.slice(2, 4)),
+        datasets: [
+          { label: "Leads", data: meses.map((m) => m.leads), backgroundColor: "rgba(124,58,237,0.75)", borderRadius: 4, order: 2 },
+          { label: "Ventas", data: meses.map((m) => m.ventas), type: "line", borderColor: "#047857", backgroundColor: "#047857", tension: 0.3, pointRadius: 3, order: 1 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+      },
+    });
+  }
+});
+
+/* Presupuesto aceptado: el panel pide confirmación (mostrando a qué email irán los leads) y crea la campaña
+   en borrador con los datos del cliente. Al volver, el presupuesto queda marcado con su campaña. */
+var _aceptandoPresupuesto = {};
+function botonAceptarPresupuesto(p, i) {
+  if (p.estado === "aceptado")
+    return '<button onclick="abrirCampanaPanel(\'' + esc(p.campana || "") + '\')" title="Aceptado: abrir su campaña en el panel" ' +
+      'style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid rgba(4,120,87,0.35);background:rgba(4,120,87,0.08);color:#047857;cursor:pointer;margin-right:4px;">✅ ' +
+      esc(p.campana || "Aceptado") + "</button>";
+  return '<button onclick="aceptarPresupuesto(' + i + ')" title="El cliente lo ha aceptado: crear su campaña" ' +
+    'style="font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid rgba(124,58,237,0.35);background:rgba(124,58,237,0.08);color:var(--accent);cursor:pointer;margin-right:4px;">✅ Aceptado</button>';
+}
+function aceptarPresupuesto(i) {
+  var c = activeId && db.find((x) => x.id === activeId),
+    p = c && (c.presupuestos || [])[i];
+  if (!p || !p.ref || _aceptandoPresupuesto[p.ref]) return;
+  _aceptandoPresupuesto[p.ref] = true;
+  CRM_PUENTE.enviar("crear-campana", {
+    clienteId: c.id,
+    ref: p.ref,
+    cliente: { nombre: c.nombre, email: c.email, cif: c.cif, sector: c.sector, provincia: c.provincia, municipio: c.municipio },
+  });
+}
+CRM_PUENTE.en("campana-creada", function (d) {
+  delete _aceptandoPresupuesto[d.ref];
+  var c = db.find((x) => x.id === d.clienteId);
+  if (!c) return;
+  var p = (c.presupuestos || []).find((x) => x.ref === d.ref);
+  if (p) {
+    p.estado = "aceptado";
+    p.aceptadoEl = new Date().toISOString();
+    p.campana = d.slug;
+  }
+  if (!c.pipeline || ["prospecto", "pendiente-datos", "presupuestado", "negociacion"].includes(c.pipeline)) c.pipeline = "pedido-curso";
+  save();
+  cargarLista();
+  if (c.id === activeId) renderPerfil();
+  registrarAccion(c.id, "Presupuesto aceptado", d.ref + " · campaña " + d.slug + " creada en borrador");
+  mostrarToast("Campaña «" + d.slug + "» creada en borrador ✓", "ok");
+});
+CRM_PUENTE.en("campana-error", function (d) {
+  delete _aceptandoPresupuesto[d.ref];
+  if (d.mensaje && d.mensaje !== "cancelado") mostrarToast(d.mensaje, "err");
+});
+
+// La ficha inicial ya se pintó antes de que existiera el envoltorio de renderPerfil: se piden sus campañas ahora.
+pedirCampanasCliente();

@@ -53,7 +53,7 @@
     return s.replace(/-+$/, '');
   }
 
-  function montar(cont, ctx) {
+  function montar(cont, ctx, param) {
     var el = ctx.el, ymd = ctx.ymd;
 
     function limpiar() { ctx.clear(cont); }
@@ -141,6 +141,35 @@
     }
 
     function valOrNull(input) { var v = input.value.trim(); return v === '' ? null : v; }
+
+    // Clientes del CRM (crm_datos.ncrm_crm) para asociar la campaña. Solo se usan id y nombre; textContent.
+    function cargarClientesCrm(sel, actual) {
+      sel.disabled = true;
+      sel.appendChild(el('option', null, 'Cargando clientes…'));
+      ctx.api('/rest/v1/crm_datos?select=valor&clave=eq.ncrm_crm')
+        .then(function (r) {
+          if (r.status === 401) { ctx.sesionCaducada(); return null; }
+          if (!r.ok) throw new Error('crm');
+          return r.json();
+        })
+        .then(function (filas) {
+          if (!filas) return;
+          var clientes = [];
+          try { clientes = filas.length ? JSON.parse(filas[0].valor) : []; } catch (e) { clientes = []; }
+          ctx.clear(sel);
+          var o0 = el('option', null, '— Sin asociar —'); o0.value = ''; sel.appendChild(o0);
+          clientes.filter(function (c) { return c && Number.isInteger(c.id) && c.nombre; })
+            .sort(function (x, y) { return String(x.nombre).localeCompare(String(y.nombre), 'es'); })
+            .forEach(function (c) { var o = el('option', null, c.nombre); o.value = String(c.id); sel.appendChild(o); });
+          // Si estaba asociada a un cliente que ya no existe en el CRM, se mantiene visible.
+          if (actual && !clientes.some(function (c) { return c && c.id === actual; })) {
+            var oX = el('option', null, 'Cliente ' + actual + ' (ya no está en el CRM)'); oX.value = String(actual); sel.appendChild(oX);
+          }
+          sel.value = actual ? String(actual) : '';
+          sel.disabled = false;
+        })
+        .catch(function () { ctx.clear(sel); sel.appendChild(el('option', null, 'No se pudieron leer los clientes del CRM')); });
+    }
 
     // Historial del email de destino (campanas_cambios, lo rellena solo un trigger en Supabase: alta, cambios
     // y baja, con quién y cuándo). Solo lectura: el panel no puede escribir en esa tabla.
@@ -839,6 +868,15 @@
       var colorSec = campoColor('Color secundario', a.tema_color_secundario, false);
       // Origen del color (migración 20260929010000_color_origen.sql). Solo si la columna ya existe.
       var conOrigen = Object.prototype.hasOwnProperty.call(a, 'tema_color_origen');
+      var conCliente = Object.prototype.hasOwnProperty.call(a, 'crm_cliente_id');
+      var fCliente = el('div', 'field');
+      var sCliente = el('select');
+      if (conCliente) {
+        fCliente.appendChild(el('label', 'lbl', 'Cliente del CRM'));
+        fCliente.appendChild(sCliente);
+        fCliente.appendChild(el('p', 'p-note', 'Con el cliente asociado, su ficha en el CRM muestra los leads y ventas de esta campaña.'));
+        cargarClientesCrm(sCliente, a.crm_cliente_id);
+      }
       var origen = el('p', 'p-note');
       function pintarOrigen() {
         var o = a.tema_color_origen;
@@ -872,7 +910,7 @@
       var guardar = el('button', 'btn', 'Guardar ficha'); guardar.type = 'submit';
       var msg = el('p', 'p-note');
       form.append(err, nombre.wrap, emailDestino.wrap, fLimite, razon.wrap, cif.wrap, emailPriv.wrap,
-        sector.wrap, zona.wrap, color.wrap, colorSec.wrap, fCampos, guardar, msg);
+        sector.wrap, zona.wrap, fCliente, color.wrap, colorSec.wrap, fCampos, guardar, msg);
       sec.appendChild(form);
       var historial = historialEmail(a);
       sec.appendChild(historial.wrap);
@@ -906,6 +944,7 @@
           err.textContent = 'El formulario necesita al menos un campo.'; err.style.display = 'block'; return;
         }
         if (iEscala) payload.logo_landing_escala = parseInt(iEscala.value, 10);
+        if (conCliente && !sCliente.disabled) payload.crm_cliente_id = sCliente.value ? parseInt(sCliente.value, 10) : null;
         if (conOrigen) {
           if (!colorHex) payload.tema_color_origen = null;
           else if (colorHex.toLowerCase() !== String(a.tema_color || '').toLowerCase()) payload.tema_color_origen = 'manual';
@@ -1139,7 +1178,9 @@
       return sec;
     }
 
-    cargarLista();
+    // Desde el CRM («Abrir campaña») se llega con el slug: directo a su ficha.
+    if (typeof param === 'string' && /^[a-z0-9][a-z0-9-]{0,60}$/.test(param)) abrirDetalle(param);
+    else cargarLista();
   }
 
   PanelCore.registrar({ id: 'campanas', titulo: 'Campañas', montar: montar });

@@ -89,15 +89,27 @@
     return;
   }
 
+  // Peticiones del CRM al panel y respuestas (crear campaña al aceptar un presupuesto, trazabilidad de las
+  // campañas de un cliente, abrir una campaña). Lo que llega del panel también se neutraliza.
+  var oyentes = {};
+  window.CRM_PUENTE = {
+    enviar: function (tipo, datos) { if (puerto) puerto.postMessage({ tipo: tipo, datos: datos || {} }); },
+    en: function (tipo, fn) { oyentes[tipo] = fn; }
+  };
+
   var arrancado = false;
   function recibir(ev) {
     var m = ev.data || {};
+    if (arrancado && typeof m.tipo === 'string' && oyentes[m.tipo]) {
+      try { oyentes[m.tipo](neutralizarTodo(m.datos || {})); } catch (e) { /* un fallo de pintado no rompe el canal */ }
+      return;
+    }
     if (m.tipo === 'init' && !arrancado && m.datos && typeof m.datos === 'object') {
       arrancado = true;
       Object.keys(m.datos).forEach(function (k) {
         if (PERSISTEN.test(k) && typeof m.datos[k] === 'string') datos[k] = limpio(k, m.datos[k]);
       });
-      cargarScripts(['vendor/chart.umd.min.js', 'vendor/xlsx.full.min.js', 'app.js?v=1'], function () {
+      cargarScripts(['vendor/chart.umd.min.js', 'vendor/xlsx.full.min.js', 'app.js?v=3'], function () {
         puerto.postMessage({ tipo: 'arrancado' });
       });
     }
