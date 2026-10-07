@@ -40,7 +40,7 @@
     marco.setAttribute('referrerpolicy', 'no-referrer');
     // Portapapeles: los botones «Copiar» del CRM (informes, plantillas) lo necesitan dentro del marco.
     marco.setAttribute('allow', 'clipboard-write');
-    marco.src = '/crm/index.html?v=4';
+    marco.src = '/crm/index.html?v=5';
     cont.append(barra, marco);
 
     pintarEstado = function (txt, tipo) {
@@ -51,7 +51,7 @@
     recargar.addEventListener('click', function () {
       if (hayPendientes() && !conflicto && !confirm('Hay cambios guardándose todavía. ¿Recargar igualmente?')) return;
       conflicto = false; pendientes = {}; recargar.style.display = 'none';
-      marco.src = '/crm/index.html?v=4&r=' + Date.now();
+      marco.src = '/crm/index.html?v=5&r=' + Date.now();
     });
 
     var puerto = null;
