@@ -6807,5 +6807,111 @@ CRM_PUENTE.en("campana-error", function (d) {
   if (d.mensaje && d.mensaje !== "cancelado") mostrarToast(d.mensaje, "err");
 });
 
+/* ══ Candy Ads: Preventa en la ficha y en «Recordatorios pendientes» ═══════════════════════════════════
+   Las llamadas de preventa viven en la tabla crm_preventa (pestaña Preventa del panel), NO en este bloque de
+   datos. El panel las pasa por CRM_PUENTE: 'preventa' (la de la empresa abierta) y 'preventa-avisos'
+   (interesados y citas). Un aviso desaparece solo cuando la empresa avanza de fase en el CRM (deja de ser
+   prospecto / pendiente de datos), o cuando preventa la marca con otro resultado. Solo lectura. */
+var PV_RES = { no_contesta: "No contesta", volver: "Volver a llamar", interesado: "Interesado", cita: "Cita",
+  no_interesado: "No interesado", erroneo: "Dato erróneo" };
+var PV_EST = Object.assign({ pendiente: "Sin llamar", sin_respuesta: "Sin respuesta (5 intentos)" }, PV_RES);
+var _pvAvisos = [];
+function pvEsProspecto(c) { return !c.pipeline || c.pipeline === "prospecto" || c.pipeline === "pendiente-datos"; }
+function pvFecha(iso) { var p = String(iso || "").slice(0, 10).split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : ""; }
+function pvFechaHora(ts) {
+  var d = new Date(ts);
+  return isNaN(d) ? "" : d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) + " " +
+    d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+function abrirPreventaPanel() { CRM_PUENTE.enviar("abrir-preventa"); }
+
+function pedirPreventaCliente() {
+  var c = activeId && db.find((x) => x.id === activeId);
+  var ancla = document.getElementById("card-campanas-cliente");
+  if (!c || !ancla) return;
+  if (pvEsProspecto(c) && !document.getElementById("card-preventa-cliente")) pvTarjeta(ancla, '<p style="color:var(--text3);font-size:12.5px;">Cargando su preventa…</p>');
+  CRM_PUENTE.enviar("pedir-preventa", { clienteId: c.id });
+}
+function pvTarjeta(ancla, cuerpo) {
+  var t = document.getElementById("card-preventa-cliente");
+  if (!t) {
+    t = document.createElement("div");
+    t.className = "card"; t.id = "card-preventa-cliente"; t.style.marginBottom = "16px";
+    ancla.parentNode.insertBefore(t, ancla.nextSibling);
+  }
+  t.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">' +
+    '<div class="card-title" style="margin:0;padding:0;border:none;color:#16a34a;">📞 Preventa</div>' +
+    '<button class="btn-add" onclick="abrirPreventaPanel()" style="margin:0;padding:5px 12px;font-size:12px;background:rgba(22,163,74,0.08);color:#16a34a;border:1px solid rgba(22,163,74,0.3);">Abrir Preventa</button></div>' + cuerpo;
+}
+CRM_PUENTE.en("preventa", function (d) {
+  var ancla = document.getElementById("card-campanas-cliente");
+  var c = db.find((x) => x.id === activeId);
+  if (!ancla || !c || d.clienteId !== activeId) return;
+  if (d.error) { pvTarjeta(ancla, '<p style="color:#dc2626;font-size:12.5px;">' + esc(d.error) + "</p>"); return; }
+  var f = d.fila;
+  if (!f) {
+    if (pvEsProspecto(c)) pvTarjeta(ancla, '<p style="color:var(--text3);font-size:12.5px;">Sin llamadas de preventa todavía. Está en la cola de la pestaña Preventa.</p>');
+    return;
+  }
+  var res = (f.resultados || []).slice().reverse();
+  var cab = '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">' + esc(PV_EST[f.estado] || f.estado) +
+    (f.intentos ? ' · ' + f.intentos + ' intento' + (f.intentos > 1 ? "s" : "") : "") +
+    (f.proxima ? ' · ' + esc(pvFecha(f.proxima)) : "") + "</div>";
+  var lista = res.slice(0, 15).map(function (r) {
+    return '<div style="font-size:12px;padding:5px 0;border-top:1px solid var(--border);' + (r.anulado ? "text-decoration:line-through;color:var(--text3);" : "color:var(--text2);") + '">' +
+      '<b>' + esc(PV_RES[r.resultado] || r.resultado) + "</b>" + (r.fecha ? " → " + esc(pvFecha(r.fecha)) : "") +
+      ' · ' + esc(pvFechaHora(r.ts)) + (r.operador ? " · " + esc(r.operador) : "") + (r.quien ? ' <span style="color:var(--text3);">(' + esc(r.quien) + ")</span>" : "") +
+      (r.nota ? '<div style="color:var(--text3);">«' + esc(r.nota) + "»</div>" : "") + "</div>";
+  }).join("");
+  if (res.length > 15) lista += '<div style="font-size:11px;color:var(--text3);padding-top:4px;">… y ' + (res.length - 15) + " más en la pestaña Preventa.</div>";
+  pvTarjeta(ancla, cab + lista);
+});
+
+CRM_PUENTE.en("preventa-avisos", function (d) {
+  _pvAvisos = Array.isArray(d.avisos) ? d.avisos : [];
+  renderAlertas();
+});
+(function () {
+  // «Recordatorios pendientes»: además de los recordatorios del CRM, los interesados y citas de preventa de
+  // empresas que siguen como prospecto (en cuanto el comercial avanza la fase, el aviso desaparece).
+  var renderAlertasBase = renderAlertas;
+  renderAlertas = function () {
+    var r = renderAlertasBase.apply(this, arguments);
+    var avisos = _pvAvisos.map(function (a) {
+      var c = db.find((x) => x.id === a.clienteId);
+      return c && pvEsProspecto(c) ? { a: a, c: c } : null;
+    }).filter(Boolean);
+    if (!avisos.length) return r;
+    avisos.sort(function (x, y) { return (x.a.proxima || "9") < (y.a.proxima || "9") ? -1 : 1; });
+    var panel = document.getElementById("alerts-panel"), wrapper = document.getElementById("alerts-wrapper"),
+      badge = document.getElementById("alerts-badge");
+    if (!panel || !wrapper) return r;
+    var base = wrapper.style.display === "none" ? 0 : parseInt(badge && badge.textContent, 10) || 0;
+    if (wrapper.style.display === "none") panel.innerHTML = "";
+    wrapper.style.display = "block";
+    if (badge) badge.textContent = base + avisos.length;
+    var hoy = new Date().toISOString().slice(0, 10);
+    panel.innerHTML = avisos.map(function (v) {
+      var cita = v.a.estado === "cita", urg = cita && v.a.proxima && v.a.proxima <= hoy;
+      return '<div class="alert-chip" onclick="seleccionarCliente(' + v.c.id + ')" style="border-left:3px solid ' + (cita ? "#7C3AED" : "#16a34a") + ';">' +
+        '<span class="alert-ico">' + (cita ? "📅" : "👍") + '</span><div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:600;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(v.c.nombre) + "</div>" +
+        '<div style="font-size:11px;">' + (cita ? "Cita de preventa" : "Interesado (preventa)") + (v.a.nota ? ": " + esc(v.a.nota) : "") + "</div>" +
+        '<div style="font-size:10px;color:' + (urg ? "#ef4444" : "var(--text3)") + ';margin-top:1px;">' +
+        (cita && v.a.proxima ? "Cita: " + esc(pvFecha(v.a.proxima)) : "Desde " + esc(pvFechaHora(v.a.ts))) + (v.a.operador ? " · " + esc(v.a.operador) : "") +
+        "</div></div></div>";
+    }).join("") + panel.innerHTML;
+    return r;
+  };
+  var renderPerfilPv = renderPerfil;
+  renderPerfil = function () {
+    var r = renderPerfilPv.apply(this, arguments);
+    pedirPreventaCliente();
+    return r;
+  };
+})();
+
 // La ficha inicial ya se pintó antes de que existiera el envoltorio de renderPerfil: se piden sus campañas ahora.
 pedirCampanasCliente();
+pedirPreventaCliente();
+CRM_PUENTE.enviar("pedir-preventa-avisos");

@@ -40,7 +40,7 @@
     marco.setAttribute('referrerpolicy', 'no-referrer');
     // Portapapeles: los botones «Copiar» del CRM (informes, plantillas) lo necesitan dentro del marco.
     marco.setAttribute('allow', 'clipboard-write');
-    marco.src = '/crm/index.html?v=8';
+    marco.src = '/crm/index.html?v=9';
     cont.append(barra, marco);
 
     pintarEstado = function (txt, tipo) {
@@ -51,7 +51,7 @@
     recargar.addEventListener('click', function () {
       if (hayPendientes() && !conflicto && !confirm('Hay cambios guardándose todavía. ¿Recargar igualmente?')) return;
       conflicto = false; pendientes = {}; recargar.style.display = 'none';
-      marco.src = '/crm/index.html?v=8&r=' + Date.now();
+      marco.src = '/crm/index.html?v=9&r=' + Date.now();
     });
 
     var puerto = null;
@@ -104,6 +104,34 @@
       return r.json();
     }
     function texto(v, max) { var s = v == null ? '' : String(v).trim(); return s ? s.slice(0, max || 120) : null; }
+
+    // Preventa (tabla crm_preventa, migración 20261010000000_preventa_rol.sql). Si la migración aún no está
+    // aplicada (404), se responde vacío: el CRM simplemente no muestra nada de preventa.
+    function filasPreventa(r) {
+      if (r.status === 404) return [];
+      return json(r);
+    }
+    function preventaCliente(d) {
+      var id = entero(d.clienteId);
+      if (!id) return;
+      ctx.api('/rest/v1/crm_preventa?select=cliente_id,estado,intentos,ultima,proxima,resultados&cliente_id=eq.' + id)
+        .then(filasPreventa)
+        .then(function (f) { responder('preventa', { clienteId: id, fila: f[0] || null }); })
+        .catch(function (e) { if (e.message !== 'sesión') responder('preventa', { clienteId: id, error: 'No se pudo leer su preventa.' }); });
+    }
+    // Interesados y citas de preventa: avisos para el comercial (el CRM filtra los que ya avanzó de fase).
+    function preventaAvisos() {
+      ctx.api('/rest/v1/crm_preventa?select=cliente_id,estado,proxima,resultados&estado=in.(interesado,cita)')
+        .then(filasPreventa)
+        .then(function (fs) {
+          responder('preventa-avisos', { avisos: fs.map(function (f) {
+            var vivos = (f.resultados || []).filter(function (r) { return !r.anulado; }), u = vivos[vivos.length - 1] || {};
+            return { clienteId: f.cliente_id, estado: f.estado, proxima: f.proxima || '', ts: u.ts || '',
+                     nota: texto(u.nota, 300) || '', operador: texto(u.operador, 40) || texto(u.quien, 120) || '' };
+          }) });
+        })
+        .catch(function () { /* sin avisos de preventa: no es crítico */ });
+    }
 
     // Leads y ventas de todas las campañas asociadas a un cliente del CRM (solo cifras, ningún dato de leads).
     function trazabilidad(d) {
@@ -213,6 +241,8 @@
         return;
       }
       if (m.tipo === 'abrir-preventa') { ctx.irA('preventa'); return; }
+      if (m.tipo === 'pedir-preventa') { preventaCliente(m.datos || {}); return; }
+      if (m.tipo === 'pedir-preventa-avisos') { preventaAvisos(); return; }
       if (conflicto) return;
       if (m.tipo === 'guardar' && typeof m.clave === 'string' && typeof m.valor === 'string') {
         if (m.valor.length > MAX_VALOR) { pintarEstado('Demasiado grande para guardar (máx. 8 MB por bloque). Quita algún PDF.', 'mal'); return; }
