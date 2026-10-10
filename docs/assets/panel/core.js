@@ -12,6 +12,7 @@
   var app = document.getElementById('app');
   var token = null; // solo en memoria: al cerrar o recargar la pestana hay que volver a entrar
   var herramientas = [];
+  var rol = null;   // 'admin' | 'preventa', tras el doble factor
 
   function el(tag, cls, text) {
     var e = document.createElement(tag);
@@ -52,16 +53,27 @@
 
   // Las herramientas llaman a esto cuando la API responde 401.
   function sesionCaducada() {
-    token = null;
+    token = null; rol = null;
     login('La sesión ha caducado. Vuelve a entrar.');
   }
 
-  function salir() { token = null; login(); }
+  function salir() { token = null; rol = null; login(); }
 
   function rpcBool(fn) {
     return api('/rest/v1/rpc/' + fn, { method: 'POST', body: '{}' })
       .then(function (r) { return r.ok ? r.json() : false; })
       .then(function (v) { return v === true; });
+  }
+
+  // Rol de la sesión aal2: 'admin' (todo) o 'preventa' (solo la cola de llamadas). Lo decide panel_rol() en la
+  // base de datos (migración 20261010000000_preventa_rol.sql); la RLS aplica lo mismo, esto solo elige pestañas.
+  // Si la migración aún no está aplicada (la función no existe), se cae al comportamiento anterior: es_admin().
+  function leerRol() {
+    return api('/rest/v1/rpc/panel_rol', { method: 'POST', body: '{}' }).then(function (r) {
+      if (r.status === 404) return rpcBool('es_admin').then(function (a) { return a ? 'admin' : null; });
+      if (!r.ok) return null;
+      return r.json().then(function (v) { return v === 'admin' || v === 'preventa' ? v : null; });
+    });
   }
 
   function jsonDe(r) {
@@ -221,10 +233,11 @@
       verificar(factorId, codigo, !!totp, false)
         .then(function (aal2) {
           token = aal2; // sesión aal2: a partir de aquí la RLS deja leer
-          return rpcBool('es_admin');
+          return leerRol();
         })
-        .then(function (esAdmin) {
-          if (!esAdmin) { token = null; throw new Error('Esta cuenta no tiene acceso al panel.'); }
+        .then(function (r) {
+          if (!r) { token = null; throw new Error('Esta cuenta no tiene acceso al panel.'); }
+          rol = r;
           shell();
         })
         .catch(function (e) { mostrar(e.message || 'No se pudo verificar.'); b.disabled = false; i.value = ''; i.focus(); });
@@ -274,7 +287,10 @@
     var barra = el('div', 'p-tabs');
     var cont = el('div', 'p-cont');
     var botones = {};
-    herramientas.forEach(function (h) {
+    // Cada herramienta declara qué roles la ven (por defecto solo admin).
+    var visibles = herramientas.filter(function (h) { return (h.roles || ['admin']).indexOf(rol) >= 0; });
+    ctx.rol = rol;
+    visibles.forEach(function (h) {
       var b = el('button', 'p-tab', h.titulo);
       b.type = 'button';
       b.addEventListener('click', function () { abrir(h.id); });
@@ -287,12 +303,13 @@
     app.append(barra, cont);
 
     function abrir(id, param) {
-      var h = herramientas.filter(function (x) { return x.id === id; })[0] || herramientas[0];
+      var h = visibles.filter(function (x) { return x.id === id; })[0] || visibles[0];
       if (!h) return;
       Object.keys(botones).forEach(function (k) { botones[k].classList.toggle('activa', k === h.id); });
       try { history.replaceState(null, '', '#' + h.id); } catch (e) { /* sin historial: da igual */ }
       // Herramientas que necesitan toda la pantalla (p. ej. el CRM) se registran con ancho: true.
       document.body.classList.toggle('modo-ancho', !!h.ancho);
+      document.body.classList.toggle('modo-medio', !!h.medio);
       clear(cont);
       h.montar(cont, ctx, param);
     }

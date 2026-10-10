@@ -40,7 +40,7 @@
     marco.setAttribute('referrerpolicy', 'no-referrer');
     // Portapapeles: los botones «Copiar» del CRM (informes, plantillas) lo necesitan dentro del marco.
     marco.setAttribute('allow', 'clipboard-write');
-    marco.src = '/crm/index.html?v=7';
+    marco.src = '/crm/index.html?v=8';
     cont.append(barra, marco);
 
     pintarEstado = function (txt, tipo) {
@@ -51,7 +51,7 @@
     recargar.addEventListener('click', function () {
       if (hayPendientes() && !conflicto && !confirm('Hay cambios guardándose todavía. ¿Recargar igualmente?')) return;
       conflicto = false; pendientes = {}; recargar.style.display = 'none';
-      marco.src = '/crm/index.html?v=7&r=' + Date.now();
+      marco.src = '/crm/index.html?v=8&r=' + Date.now();
     });
 
     var puerto = null;
@@ -212,6 +212,7 @@
         if (typeof s === 'string' && /^[a-z0-9][a-z0-9-]{0,60}$/.test(s)) ctx.irA('campanas', s);
         return;
       }
+      if (m.tipo === 'abrir-preventa') { ctx.irA('preventa'); return; }
       if (conflicto) return;
       if (m.tipo === 'guardar' && typeof m.clave === 'string' && typeof m.valor === 'string') {
         if (m.valor.length > MAX_VALOR) { pintarEstado('Demasiado grande para guardar (máx. 8 MB por bloque). Quita algún PDF.', 'mal'); return; }

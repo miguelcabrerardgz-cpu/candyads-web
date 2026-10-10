@@ -30,7 +30,7 @@
         <button onclick="toggleDarkMode()" title="Cambiar tema" style="width:34px;min-width:34px;padding:0;border-radius:7px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;"><span id="dark-icon">🌙</span></button>
       </div>
       <button class="btn-new" onclick="abrirModalCliente(false)">＋ Nueva Empresa</button>
-      <button class="btn-new" onclick="abrirPreventa()" style="margin-top:6px;background:#16a34a;" title="Cola de llamadas a prospectos">📞 Preventa</button>
+      <button class="btn-new" onclick="CRM_PUENTE.enviar('abrir-preventa')" style="margin-top:6px;background:#16a34a;" title="Abre la pestaña Preventa del panel (cola de llamadas a prospectos)">📞 Preventa</button>
       <div style="display:flex;gap:6px;margin-top:6px;">
         <button class="btn-new" onclick="abrirKanban()" style="flex:1;background:var(--accent2);">📋 Kanban</button>
         <button class="btn-new" onclick="abrirCalendarioGlobal()" style="flex:1;background:rgba(99,102,241,0.85);" title="Calendario global">📅 Agenda</button>
@@ -478,7 +478,7 @@
 <!-- Calendar global modal moved to end of body -->
 
 <!-- puente.js recibe los datos del panel y después carga vendor/ (Chart.js, SheetJS) y app.js. -->
-<script src="puente.js?v=7"></script>
+<script src="puente.js?v=8"></script>
 
 <div class="modal-bg" id="modal-presupuesto">
   <div class="modal-box wide" style="max-width:780px;max-height:92vh;overflow-y:auto;">
