@@ -1,5 +1,11 @@
 (function () {
   'use strict';
+  // Formularios de leads y confirmación de venta: nunca dentro de un marco ajeno (clickjacking sobre la casilla
+  // de consentimiento o el botón «Sí, terminó en venta»). GitHub Pages no permite X-Frame-Options.
+  try {
+    if (window.top !== window.self) { window.top.location = window.self.location.href; return; }
+  } catch (e) { document.documentElement.style.display = 'none'; return; }
+
 
   // URL base del backend en AWS Lambda (rutas /challenge y /lead). Vacío = modo demostración: no se envía nada.
   // En localhost se usa un backend de pruebas del mismo origen.

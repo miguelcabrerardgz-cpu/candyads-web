@@ -324,9 +324,24 @@
     supabaseUrl: SUPABASE_URL
   };
 
+  // El panel nunca se muestra dentro de un marco ajeno (clickjacking: una página que lo cargara oculta
+  // para que el admin pulse sin saberlo). GitHub Pages no permite X-Frame-Options ni frame-ancestors, así que
+  // se comprueba aquí: si va enmarcado, no se pinta ni el login.
+  function enmarcado() {
+    try { return window.top !== window.self; } catch (e) { return true; }
+  }
+
   window.PanelCore = {
     registrar: function (h) { herramientas.push(h); },
-    iniciar: function () { login(); }
+    iniciar: function () {
+      if (enmarcado()) {
+        clear();
+        app.appendChild(el('p', 'p-err', 'El panel solo se puede usar abriendo candyads.es/panel.html directamente.'));
+        try { window.top.location = window.self.location.href; } catch (e) { /* el marco lo impide: no se muestra nada más */ }
+        return;
+      }
+      login();
+    }
   };
 
   // Las herramientas se registran al cargarse (scripts posteriores); se arranca cuando el documento termina.

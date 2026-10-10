@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script src="/assets/legal.js?v=1"></script>
 <title>Política de Cookies | Candy Ads</title>
 <link rel="stylesheet" href="/assets/fonts.css">
 <style>
@@ -38,7 +41,7 @@ a:hover{text-decoration:underline;}
 </div></nav>
 <div class="legal-wrap">
 <h1>Política de Cookies</h1>
-<p class="meta">Última actualización: 22 de septiembre de 2026 &nbsp;·&nbsp; LSSI-CE Art. 22.2, RGPD y directrices de la AEPD</p>
+<p class="meta">Última actualización: 11 de octubre de 2026 &nbsp;·&nbsp; LSSI-CE Art. 22.2, RGPD y directrices de la AEPD</p>
 
 <h2>1. Qué son las cookies</h2>
 <p>Las cookies son pequeños archivos de texto que un sitio web almacena en el dispositivo del usuario al visitarlo. Permiten recordar información entre visitas o recopilar datos sobre el comportamiento de navegación. Conforme al artículo 22.2 de la LSSI-CE y al RGPD, cualquier cookie no estrictamente técnica requiere el consentimiento previo e informado del usuario.</p>
@@ -48,6 +51,7 @@ a:hover{text-decoration:underline;}
 <table>
 <tr><th>Nombre</th><th>Tipo de almacenamiento</th><th>Titular</th><th>Finalidad</th><th>Duración</th></tr>
 <tr><td>ca_ck</td><td>localStorage (no es una cookie de servidor)</td><td>Candy Ads (propia)</td><td>Recuerda si ya has elegido tu preferencia sobre el banner de cookies, para no volver a mostrarlo</td><td>Hasta que borres los datos de este sitio en tu navegador, o pulses «Restablecer preferencias» más abajo</td></tr>
+<tr><td>pv_operador</td><td>localStorage</td><td>Candy Ads (propia)</td><td>Solo en el panel interno del equipo (no accesible al público): recuerda el nombre que escribe la persona que hace las llamadas comerciales</td><td>Hasta que se borre desde el navegador</td></tr>
 </table>
 <p>Este sitio web <strong>no utiliza cookies analíticas</strong> (Google Analytics u otras), <strong>ni cookies de publicidad</strong>, <strong>ni cookies o almacenamiento de terceros</strong>. Todas las fuentes tipográficas se sirven desde <strong>candyads.es</strong>; no se realiza ninguna petición a Google Fonts ni a ningún otro proveedor externo al cargar la página. Si en el futuro se incorpora algún elemento de terceros, esta Política se actualizará y se solicitará el consentimiento correspondiente.</p>
 
@@ -60,7 +64,7 @@ a:hover{text-decoration:underline;}
 <h2>5. Gestión del consentimiento</h2>
 <p>Al acceder al Sitio Web se muestra un banner que permite aceptar todas las cookies o seleccionar solo las necesarias. Puedes modificar tu preferencia en cualquier momento:</p>
 <p style="margin-top:12px;">
-  <button onclick="localStorage.removeItem('ca_ck');location.reload();" style="background:#7C3AED;color:#fff;border:none;padding:10px 20px;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Restablecer preferencias de cookies</button>
+  <button id="reset-cookies" type="button" style="background:#7C3AED;color:#fff;border:none;padding:10px 20px;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Restablecer preferencias de cookies</button>
 </p>
 
 <h2>6. Cómo borrar este dato desde el navegador</h2>
