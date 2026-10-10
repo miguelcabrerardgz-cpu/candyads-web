@@ -57,8 +57,11 @@
   }
 
   // Morado oficial de Candy Ads: color del formulario si la campaña no tiene uno propio o no deja leer el texto
-  // blanco de los botones (contraste WCAG < 3:1). El panel aplica la misma regla y lo avisa en la ficha.
-  var COLOR_MARCA = '#8B7BC0';
+  // blanco de los botones (contraste WCAG < 4,5:1, el mínimo AA para texto de 16 px como el del botón y los
+  // enlaces de 12,5 px). El panel aplica la misma regla y lo avisa en la ficha. #7A67B7 es el morado de marca
+  // #8B7BC0 oscurecido lo justo para llegar a 4,7:1 con blanco (el #8B7BC0 se queda en 3,7:1).
+  var COLOR_MARCA = '#7A67B7';
+  var CONTRASTE_MIN = 4.5;
 
   function contrasteBlanco(hex) {
     var l = rgb(hex).map(function (v) {
@@ -71,7 +74,7 @@
   function aplicarTema(cfg) {
     var t = cfg.tema || {};
     var root = document.documentElement.style;
-    var color = HEX_RE.test(t.color || '') && contrasteBlanco(t.color) >= 3 ? t.color : COLOR_MARCA;
+    var color = HEX_RE.test(t.color || '') && contrasteBlanco(t.color) >= CONTRASTE_MIN ? t.color : COLOR_MARCA;
     var c = rgb(color);
     root.setProperty('--adv', color);
     root.setProperty('--adv-rgb', c.join(','));

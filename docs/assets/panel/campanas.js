@@ -25,8 +25,8 @@
 
   // Morado oficial de Candy Ads: color del formulario público cuando la campaña no tiene uno propio legible.
   // lead.js aplica la misma regla (mismo valor y mismo umbral) al pintar /lead/<slug>.
-  var COLOR_MARCA = '#8B7BC0';
-  var CONTRASTE_MIN = 3;
+  var COLOR_MARCA = '#7A67B7';  // = lead.js (morado de marca con contraste AA sobre blanco)
+  var CONTRASTE_MIN = 4.5;      // = lead.js: mínimo WCAG AA para texto normal
 
   // Contraste WCAG frente a blanco (el texto de los botones del formulario es blanco).
   function contrasteBlanco(hex) {
@@ -320,7 +320,7 @@
         var c = contrasteBlanco(v), bien = c >= CONTRASTE_MIN;
         info.className = 'p-note ' + (bien ? 'color-ok' : 'color-mal');
         info.textContent = 'Contraste con el texto blanco: ' + c.toFixed(1).replace('.', ',') + ':1 ' +
-          (bien ? '✓' : '✗ insuficiente (mínimo 3:1): el formulario usará el morado de Candy Ads.');
+          (bien ? '✓' : '✗ insuficiente (mínimo 4,5:1): el formulario usará el morado de Candy Ads.');
       }
       picker.addEventListener('input', function () { hex.value = picker.value.toUpperCase(); sync(); });
       hex.addEventListener('input', sync);
@@ -827,7 +827,7 @@
               ? 'Logo guardado. No se pudieron detectar colores automáticamente; puedes elegirlos abajo y pulsar «Guardar ficha».'
               : legible ? 'Logo y colores del tema guardados.'
               : 'Logo guardado. El color del logo (' + colores.color + ') no contrasta lo bastante con el texto blanco ' +
-                '(mínimo 3:1): se usa el morado de Candy Ads hasta que elijas otro abajo.';
+                '(mínimo 4,5:1): se usa el morado de Candy Ads hasta que elijas otro abajo.';
             notaColores.style.display = 'block';
           });
         }).catch(function (e) { errLogo.textContent = e.message; errLogo.style.display = 'block'; })
