@@ -40,7 +40,7 @@
     marco.setAttribute('referrerpolicy', 'no-referrer');
     // Portapapeles: los botones «Copiar» del CRM (informes, plantillas) lo necesitan dentro del marco.
     marco.setAttribute('allow', 'clipboard-write');
-    marco.src = '/crm/index.html?v=9';
+    marco.src = '/crm/index.html?v=10';
     cont.append(barra, marco);
 
     pintarEstado = function (txt, tipo) {
@@ -51,7 +51,7 @@
     recargar.addEventListener('click', function () {
       if (hayPendientes() && !conflicto && !confirm('Hay cambios guardándose todavía. ¿Recargar igualmente?')) return;
       conflicto = false; pendientes = {}; recargar.style.display = 'none';
-      marco.src = '/crm/index.html?v=9&r=' + Date.now();
+      marco.src = '/crm/index.html?v=10&r=' + Date.now();
     });
 
     var puerto = null;
@@ -131,6 +131,31 @@
           }) });
         })
         .catch(function () { /* sin avisos de preventa: no es crítico */ });
+    }
+
+    // Correcciones de datos de contacto hechas en Preventa (crm_preventa.cambios, migración
+    // 20261010010000_preventa_correcciones.sql). El CRM las aplica a la ficha y guarda la marca preventaAplicado
+    // en el mismo guardado, así que aquí no se marca nada: si el guardado fallara, se reintenta al reabrir.
+    var CAMPOS_PV = { contacto: 80, telefono: 16, telefonoFijo: 16, email: 120 };
+    function preventaCorrecciones() {
+      ctx.api('/rest/v1/crm_preventa?select=cliente_id,cambios&cambios=neq.%7B%7D')
+        .then(filasPreventa)
+        .then(function (fs) {
+          var items = [];
+          fs.forEach(function (f) {
+            var id = entero(f.cliente_id), cambios = {};
+            if (!id || !f.cambios || typeof f.cambios !== 'object') return;
+            Object.keys(f.cambios).forEach(function (k) {
+              var c = f.cambios[k];
+              if (!CAMPOS_PV[k] || !c || typeof c.valor !== 'string' || typeof c.ts !== 'string' || !/^[0-9T:.+\- ]{10,40}$/.test(c.ts)) return;
+              cambios[k] = { valor: c.valor.slice(0, CAMPOS_PV[k]), anterior: texto(c.anterior, 120) || '', ts: c.ts,
+                             operador: texto(c.operador, 40) || '', quien: texto(c.quien, 120) || '' };
+            });
+            if (Object.keys(cambios).length) items.push({ clienteId: id, cambios: cambios });
+          });
+          if (items.length) responder('preventa-correcciones', { items: items });
+        })
+        .catch(function () { /* no crítico: se aplicarán la próxima vez */ });
     }
 
     // Leads y ventas de todas las campañas asociadas a un cliente del CRM (solo cifras, ningún dato de leads).
@@ -243,6 +268,7 @@
       if (m.tipo === 'abrir-preventa') { ctx.irA('preventa'); return; }
       if (m.tipo === 'pedir-preventa') { preventaCliente(m.datos || {}); return; }
       if (m.tipo === 'pedir-preventa-avisos') { preventaAvisos(); return; }
+      if (m.tipo === 'pedir-preventa-correcciones') { preventaCorrecciones(); return; }
       if (conflicto) return;
       if (m.tipo === 'guardar' && typeof m.clave === 'string' && typeof m.valor === 'string') {
         if (m.valor.length > MAX_VALOR) { pintarEstado('Demasiado grande para guardar (máx. 8 MB por bloque). Quita algún PDF.', 'mal'); return; }

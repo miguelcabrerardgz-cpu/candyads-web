@@ -109,7 +109,7 @@
       Object.keys(m.datos).forEach(function (k) {
         if (PERSISTEN.test(k) && typeof m.datos[k] === 'string') datos[k] = limpio(k, m.datos[k]);
       });
-      cargarScripts(['vendor/chart.umd.min.js', 'vendor/xlsx.full.min.js', 'app.js?v=7'], function () {
+      cargarScripts(['vendor/chart.umd.min.js', 'vendor/xlsx.full.min.js', 'app.js?v=8'], function () {
         puerto.postMessage({ tipo: 'arrancado' });
       });
     }

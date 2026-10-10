@@ -47,12 +47,27 @@
       d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   }
 
+  // Misma consulta que el botón «BUSCAR EN GOOGLE» del CRM (consultaGoogle en docs/crm/app.js): nombre +
+  // municipio + provincia (si no es igual al municipio) + sector (salvo «Otros»). No escribe nada.
+  function urlGoogle(c) {
+    var t = function (v) { return v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); };
+    var nombre = t(c.nombre), municipio = t(c.municipio), provincia = t(c.provincia), sector = t(c.sector);
+    if (provincia && norm(provincia) === norm(municipio)) provincia = '';
+    if (norm(sector) === 'otros') sector = '';
+    var partes = [nombre, municipio, provincia, sector].filter(Boolean);
+    return nombre ? 'https://www.google.com/search?q=' + encodeURIComponent(partes.join(' ')).replace(/%20/g, '+') : '';
+  }
+
+  var CAMPOS = [['contacto', 'Persona de contacto', 'text'], ['telefono', 'Móvil / directo', 'tel'],
+                ['telefonoFijo', 'Teléfono fijo', 'tel'], ['email', 'Email', 'email']];
+
   function montar(cont, ctx) {
     var el = ctx.el;
     var empresas = [];      // de preventa_cola()
     var estados = {};       // cliente_id → fila de crm_preventa
     var mostrar = POR_PAGINA;
     var abiertos = {};      // historial desplegado por empresa
+    var editando = {};      // formulario «Corregir datos» abierto por empresa
 
     function h(tag, cls, text, attrs) {
       var e = el(tag, cls, text);
@@ -76,7 +91,7 @@
       return ctx.api('/rest/v1/rpc/' + fn, { method: 'POST', body: JSON.stringify(cuerpoJson || {}) }).then(function (r) {
         if (r.status === 401) { ctx.sesionCaducada(); throw new Error('sesion'); }
         return r.json().catch(function () { return null; }).then(function (j) {
-          if (r.status === 404 && j && j.code === 'PGRST202') throw new Error('Falta aplicar en Supabase la migración de Preventa (20261010000000_preventa_rol.sql).');
+          if (r.status === 404 && j && j.code === 'PGRST202') throw new Error('Falta aplicar en Supabase las migraciones de Preventa (20261010000000_preventa_rol.sql y 20261010010000_preventa_correcciones.sql).');
           if (!r.ok) throw new Error(traducir(j && j.message));
           return j;
         });
@@ -87,7 +102,10 @@
         'fecha no válida': 'Elige una fecha de hoy en adelante.',
         'empresa fuera de preventa': 'Esta empresa ya no está en preventa (es cliente en el CRM).',
         'sin permiso': 'Esta cuenta no tiene permiso para Preventa.',
-        'sin resultados': 'No hay nada que deshacer.'
+        'sin resultados': 'No hay nada que deshacer.',
+        'teléfono no válido': 'El teléfono no es válido: 9 cifras (o con prefijo +34).',
+        'email no válido': 'El email no es válido.',
+        'contacto demasiado largo': 'El nombre de contacto es demasiado largo (máx. 80).'
       })[m] || 'No se pudo guardar. Inténtalo de nuevo.';
     }
 
@@ -96,7 +114,7 @@
         rpc('preventa_cola'),
         ctx.api('/rest/v1/crm_preventa?select=*').then(function (r) {
           if (r.status === 401) { ctx.sesionCaducada(); throw new Error('sesion'); }
-          if (r.status === 404) throw new Error('Falta aplicar en Supabase la migración de Preventa (20261010000000_preventa_rol.sql).');
+          if (r.status === 404) throw new Error('Falta aplicar en Supabase las migraciones de Preventa (20261010000000_preventa_rol.sql y 20261010010000_preventa_correcciones.sql).');
           if (!r.ok) throw new Error('No se pudieron leer los resultados de preventa.');
           return r.json();
         })
@@ -258,12 +276,27 @@
         d.addEventListener('click', function () { deshacer(c, t); });
         acc.appendChild(d);
       }
+      var g = urlGoogle(c);
+      if (g) {
+        var gb = h('a', 'pv-sec pv-google', 'BUSCAR EN GOOGLE', { href: g, target: '_blank', rel: 'noopener noreferrer',
+          title: 'Busca la empresa en Google con nombre, municipio, provincia y sector (no modifica nada)' });
+        acc.appendChild(gb);
+      }
+      var eb = h('button', 'pv-sec', editando[c.id] ? 'Cerrar edición' : '✏️ Corregir datos', { type: 'button', title: 'Corrige contacto, teléfonos o email: queda en la ficha del CRM' });
+      eb.addEventListener('click', function () { editando[c.id] = !editando[c.id]; t.replaceWith(tarjeta(c)); });
+      acc.appendChild(eb);
       if ((f.resultados || []).length) {
         var hb = h('button', 'pv-sec', abiertos[c.id] ? 'Ocultar historial' : 'Historial (' + f.resultados.length + ')', { type: 'button' });
         hb.addEventListener('click', function () { abiertos[c.id] = !abiertos[c.id]; t.replaceWith(tarjeta(c)); });
         acc.appendChild(hb);
       }
       t.appendChild(acc);
+      if (editando[c.id]) t.appendChild(formDatos(c, t));
+      var pend = Object.keys(f.cambios || {}).length;
+      if (pend) {
+        var ult2 = Object.keys(f.cambios).map(function (k) { return f.cambios[k]; }).sort(function (a, b) { return a.ts < b.ts ? 1 : -1; })[0];
+        t.appendChild(h('div', 'pv-meta', '✏️ Datos corregidos por preventa (' + fechaHora(ult2.ts) + (ult2.operador ? ', ' + ult2.operador : '') + ')'));
+      }
 
       if (abiertos[c.id]) {
         var hist = h('div', 'pv-hist');
@@ -276,6 +309,43 @@
         t.appendChild(hist);
       }
       return t;
+    }
+
+    function formDatos(c, t) {
+      var f = h('form', 'pv-form');
+      var inputs = {};
+      CAMPOS.forEach(function (d) {
+        var lab = h('label', 'pv-campo');
+        lab.appendChild(h('span', null, d[1]));
+        var i = h('input', 'pv-input', null, { type: d[2], maxlength: d[0] === 'email' ? '120' : '80', autocomplete: 'off' });
+        i.value = c[d[0]] || '';
+        inputs[d[0]] = i;
+        lab.appendChild(i);
+        f.appendChild(lab);
+      });
+      var b = h('button', 'btn mini', 'Guardar datos', { type: 'submit' });
+      f.appendChild(b);
+      f.appendChild(h('div', 'p-note', 'Se guardan al momento aquí y pasan a la ficha del CRM la próxima vez que se abra, con una nota del dato anterior.'));
+      f.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        var datos = {}, hay = false;
+        CAMPOS.forEach(function (d) {
+          var v = inputs[d[0]].value.trim();
+          if (v !== (c[d[0]] || '')) { datos[d[0]] = v; hay = true; }
+        });
+        if (!hay) { editando[c.id] = false; t.replaceWith(tarjeta(c)); return; }
+        aviso.style.display = 'none';
+        bloquear(t, true);
+        rpc('preventa_corregir', { p_cliente: c.id, p_datos: datos, p_operador: operador || '' })
+          .then(function (fila) {
+            estados[c.id] = fila;
+            Object.keys(fila.cambios || {}).forEach(function (k) { c[k] = fila.cambios[k].valor; });
+            editando[c.id] = false;
+            pintar();
+          })
+          .catch(function (e) { if (e.message !== 'sesion') { error(e.message); bloquear(t, false); } });
+      });
+      return f;
     }
 
     function bloquear(t, si) { Array.prototype.forEach.call(t.querySelectorAll('button,input'), function (b) { b.disabled = si; }); }

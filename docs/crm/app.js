@@ -6867,6 +6867,36 @@ CRM_PUENTE.en("preventa", function (d) {
   pvTarjeta(ancla, cab + lista);
 });
 
+// Correcciones de contacto hechas en Preventa → a la ficha, con una nota del valor anterior. preventaAplicado
+// (campo → ts de la corrección) va en el mismo guardado: así no se aplica dos veces ni pisa un cambio posterior.
+var PV_CAMPOS = { contacto: "Persona de contacto", telefono: "Teléfono móvil", telefonoFijo: "Teléfono fijo", email: "Email" };
+CRM_PUENTE.en("preventa-correcciones", function (d) {
+  var hechos = 0, fh = fechaHoraAhora();
+  (d.items || []).forEach(function (it) {
+    var c = db.find((x) => x.id === it.clienteId);
+    if (!c || !it.cambios) return;
+    c.preventaAplicado = c.preventaAplicado || {};
+    Object.keys(it.cambios).forEach(function (k) {
+      var ch = it.cambios[k];
+      if (!PV_CAMPOS[k] || !ch || typeof ch.valor !== "string" || c.preventaAplicado[k] === ch.ts) return;
+      var antes = c[k] || "";
+      c[k] = ch.valor;
+      c.preventaAplicado[k] = ch.ts;
+      c.notas = c.notas || [];
+      c.notas.push({ texto: "📞 Preventa actualizó " + PV_CAMPOS[k] + ": «" + (antes || "vacío") + "» → «" + (ch.valor || "vacío") + "»" +
+        (ch.operador || ch.quien ? " (" + [ch.operador, ch.quien].filter(Boolean).join(" · ") + ", " + pvFechaHora(ch.ts) + ")" : ""),
+        fecha: fh.fecha, hora: fh.hora, ts: fh.ts, adjunto: null, adjuntoTipo: null, adjuntoNombre: null });
+      c.historial = c.historial || [];
+      c.historial.unshift({ tipo_accion: "Preventa actualizó " + PV_CAMPOS[k], detalles: (antes || "vacío") + " → " + (ch.valor || "vacío"), fecha: new Date().toISOString() });
+      hechos++;
+    });
+  });
+  if (!hechos) return;
+  save();
+  try { cargarLista(); renderPerfil(); } catch (e) {}
+  mostrarToast("📞 " + hechos + " dato" + (hechos > 1 ? "s" : "") + " de contacto actualizado" + (hechos > 1 ? "s" : "") + " desde Preventa", "ok");
+});
+
 CRM_PUENTE.en("preventa-avisos", function (d) {
   _pvAvisos = Array.isArray(d.avisos) ? d.avisos : [];
   renderAlertas();
@@ -6915,3 +6945,4 @@ CRM_PUENTE.en("preventa-avisos", function (d) {
 pedirCampanasCliente();
 pedirPreventaCliente();
 CRM_PUENTE.enviar("pedir-preventa-avisos");
+CRM_PUENTE.enviar("pedir-preventa-correcciones");
