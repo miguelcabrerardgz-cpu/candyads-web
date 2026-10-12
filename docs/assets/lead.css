@@ -72,8 +72,8 @@ h1{
   font-size:13px;padding:10px 12px;margin-bottom:18px;
 }
 .field{margin-bottom:16px;}
-label.lbl{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
-label.lbl .opt{font-weight:400;color:var(--muted);}
+label.lbl,legend.lbl{display:block;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;}
+label.lbl .opt,legend.lbl .opt{font-weight:400;color:var(--muted);}
 input[type=text],input[type=tel],input[type=email],select,textarea{
   width:100%;font:inherit;font-size:16px;color:var(--ink);background:#fff;
   border:1px solid #CBD0E2;border-radius:11px;padding:12px 14px;
@@ -145,3 +145,15 @@ header.logo-top{background:#fff;border-bottom:1px solid var(--border);padding:6p
 .check-fila input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--adv);flex-shrink:0;}
 .check-fila label{font-size:15px;color:var(--ink);line-height:1.4;}
 .field.invalid .check-fila label{color:var(--err);}
+/* Preferencia de contacto (formulario.js, pintarContacto): radios con aspecto de chip, grandes para el pulgar */
+fieldset.chips-field{border:0;min-width:0;}
+fieldset.chips-field legend{padding:0;}
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chips input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;}
+.chips label.chip{
+  display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;border-radius:999px;
+  border:1px solid #CBD0E2;background:#fff;color:var(--ink);font-size:15px;font-weight:600;
+  cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s,color .15s;
+}
+.chips input:checked + label.chip{background:var(--adv);border-color:var(--adv);color:#fff;}
+.chips input:focus-visible + label.chip{outline:none;box-shadow:0 0 0 3px rgba(var(--adv-rgb),.35);}

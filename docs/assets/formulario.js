@@ -151,8 +151,99 @@
     return { datos: datos, primero: primero };
   }
 
+  // ---------- Preferencia de contacto (medio y franja) ----------
+  // Dos campos opcionales, iguales en todas las campañas y fuera de campos_formulario: el editor del panel no
+  // puede cambiarlos (una errata en una opción rompería la regla del teléfono y el aviso del correo). Mismas
+  // claves y opciones, letra por letra, que CONTACTO en lambda/src/campos.mjs: si se cambia una, cambiar la otra.
+  var CONTACTO = [
+    { key: 'medio_contacto', label: '¿Cómo prefieres que te contactemos?', opciones: ['Llamada', 'WhatsApp', 'Email'] },
+    { key: 'franja_contacto', label: '¿A qué hora te viene mejor?', opciones: ['Mañana (9-13)', 'Mediodía (13-16)', 'Tarde (16-20)', 'Cuando sea'] }
+  ];
+  var RESERVADAS = CONTACTO.map(function (c) { return c.key; });
+  var MEDIOS_TELEFONO = ['Llamada', 'WhatsApp'];
+
+  function defTelefono(defs) {
+    for (var i = 0; i < defs.length; i++) if (defs[i].key === 'telefono' && defs[i].tipo === 'tel') return defs[i];
+    return null;
+  }
+
+  // Pinta los dos grupos de botones (radio con aspecto de chip, se desmarcan volviendo a tocarlos). Si la
+  // campaña no tiene campo de teléfono, el medio solo ofrece «Email»: Llamada/WhatsApp no podrían cumplirse.
+  function pintarContacto(form, defs, prefijo) {
+    var p = prefijo || 'f-';
+    var hayTel = !!defTelefono(defs);
+    var ultimo = {};
+    CONTACTO.forEach(function (c) {
+      var opciones = c.key === 'medio_contacto' && !hayTel
+        ? c.opciones.filter(function (o) { return MEDIOS_TELEFONO.indexOf(o) === -1; })
+        : c.opciones;
+      var fs = el('fieldset', { 'class': 'field chips-field', 'data-id': c.key });
+      var lg = el('legend', { 'class': 'lbl' }, c.label);
+      lg.appendChild(el('span', { 'class': 'opt' }, ' (opcional)'));
+      fs.appendChild(lg);
+      var grupo = el('div', { 'class': 'chips' });
+      opciones.forEach(function (o, i) {
+        var id = p + c.key + '-' + i;
+        var r = el('input', { type: 'radio', id: id, name: c.key, value: o });
+        r.addEventListener('click', function () {
+          if (ultimo[c.key] === r) { r.checked = false; ultimo[c.key] = null; }
+          else ultimo[c.key] = r;
+          actualizarTelefono(form, defs);
+        });
+        grupo.appendChild(r);
+        grupo.appendChild(el('label', { 'for': id, 'class': 'chip' }, o));
+      });
+      fs.appendChild(grupo);
+      form.appendChild(fs);
+    });
+  }
+
+  // querySelector y no form.elements: con una sola opción (solo «Email») elements devuelve el input suelto,
+  // cuyo .value es «Email» aunque no esté marcado.
+  function elegido(form, key) {
+    var r = form.querySelector('input[type=radio][name="' + key + '"]:checked');
+    return r ? r.value : '';
+  }
+  function medioElegido(form) { return elegido(form, 'medio_contacto'); }
+
+  // Con Llamada o WhatsApp el teléfono pasa a obligatorio: quita el «(opcional)» y cambia el mensaje de error.
+  function actualizarTelefono(form, defs) {
+    var tel = defTelefono(defs);
+    var ctl = form.elements.telefono;
+    if (!tel || !ctl) return;
+    var exige = MEDIOS_TELEFONO.indexOf(medioElegido(form)) !== -1;
+    var wrap = ctl.closest('.field');
+    var opt = wrap.querySelector('label.lbl .opt');
+    if (opt) opt.classList.toggle('hidden', exige);
+    if (!exige) wrap.classList.remove('invalid');
+  }
+
+  // Igual que leer(), con la regla del teléfono, y añade medio/franja a los datos solo si se eligieron.
+  function leerContacto(form, defs) {
+    var medio = medioElegido(form);
+    var exige = MEDIOS_TELEFONO.indexOf(medio) !== -1;
+    var defs2 = defs.map(function (d) {
+      if (exige && d.key === 'telefono' && d.tipo === 'tel' && !d.obligatorio) { var c = copia(d); c.obligatorio = true; return c; }
+      return d;
+    });
+    var r = leer(form, defs2);
+    var ctl = form.elements.telefono;
+    if (ctl) {
+      var err = document.getElementById('err-' + ctl.id);
+      if (err) err.textContent = exige && !r.datos.telefono
+        ? (medio === 'WhatsApp' ? 'Para escribirte por WhatsApp necesitamos tu teléfono' : 'Para llamarte necesitamos tu teléfono')
+        : ERRORES.tel;
+    }
+    CONTACTO.forEach(function (c) {
+      var v = elegido(form, c.key);
+      if (v && c.opciones.indexOf(v) !== -1) r.datos[c.key] = v;
+    });
+    return r;
+  }
+
   window.CandyFormulario = {
     TIPOS: TIPOS, COMUNES: COMUNES, LEGADO: LEGADO,
-    normalizar: normalizar, claveDe: claveDe, pintar: pintar, leer: leer, copia: copia
+    normalizar: normalizar, claveDe: claveDe, pintar: pintar, leer: leer, copia: copia,
+    CONTACTO: CONTACTO, RESERVADAS: RESERVADAS, pintarContacto: pintarContacto, leerContacto: leerContacto
   };
 })();

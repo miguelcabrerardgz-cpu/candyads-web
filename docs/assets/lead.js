@@ -174,8 +174,11 @@
 
     var form = el('form', { id: 'lead-form', novalidate: 'novalidate', autocomplete: 'on' });
     var CF = window.CandyFormulario;
-    var defs = CF.normalizar(cfg);
+    // medio_contacto/franja_contacto los pone siempre el código (pintarContacto): si una campaña tuviera un
+    // campo con esa clave, se ignora para que no salga dos veces ni con otras opciones.
+    var defs = CF.normalizar(cfg).filter(function (d) { return CF.RESERVADAS.indexOf(d.key) === -1; });
     CF.pintar(form, defs);
+    CF.pintarContacto(form, defs);
 
     var hp = el('div', { 'class': 'hp', 'aria-hidden': 'true' });
     hp.appendChild(el('label', { 'for': 'f-web_site' }, 'No rellenar este campo'));
@@ -200,7 +203,7 @@
     var consent = el('div', { 'class': 'consent' });
     consent.appendChild(el('input', { type: 'checkbox', id: 'f-consent', name: 'consent', 'aria-describedby': 'err-consent' }));
     consent.appendChild(el('label', { 'for': 'f-consent' },
-      'Consiento que mis datos sean enviados a ' + razonSocial + ' para que me contacte en relación con mi solicitud.'));
+      'Consiento que mis datos sean enviados a ' + razonSocial + ' para que me contacte, por el medio que haya indicado, en relación con mi solicitud.'));
     cf.appendChild(consent);
     cf.appendChild(el('p', { 'class': 'msg-err', id: 'err-consent' }, 'Necesitas aceptar para poder enviar tu solicitud.'));
     form.appendChild(cf);
@@ -250,7 +253,7 @@
       var datos = {};
       var primero = null;
 
-      var lectura = CF.leer(form, defs);
+      var lectura = CF.leerContacto(form, defs);
       datos = lectura.datos;
       primero = lectura.primero;
 
